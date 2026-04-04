@@ -415,7 +415,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-**Built with ❤️ by engineers, for engineers.**
+**Oply -  built for DevOps Communty, by SkyDarkOpenSources.**
 
 [Dashboard](http://localhost:3000) · [CLI Docs](#cli-reference) · [API Reference](#api-endpoints) · [Architecture](docs/ARCHITECTURE.md)
 
