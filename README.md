@@ -206,20 +206,23 @@ Open **http://localhost:3000** — you'll see the Oply landing page.
 cd cli
 npm install
 
-# Initialize a project
-node bin/oply.js init
+# Link the CLI globally so you can use the 'oply' command anywhere
+npm link
+
+# Now you can use the Oply CLI from any project directory!
+oply init
 
 # Check pipeline status
-node bin/oply.js status
+oply status
 
 # Deploy to staging
-node bin/oply.js deploy --env staging
+oply deploy --env staging
 
 # AI debugging
-node bin/oply.js ai-debug
+oply ai-debug
 
 # View Kubernetes pods
-node bin/oply.js k8s status
+oply k8s status
 ```
 
 ---
