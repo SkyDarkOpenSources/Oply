@@ -37,7 +37,7 @@ import { rollbackCommand } from './commands/rollback.js';
 const oplyGradient = gradient(['#6366f1', '#8b5cf6', '#a78bfa']);
 
 function showBanner() {
-  const banner = figlet.textSync('OPLY', {
+  const banner = figlet.textSync('OPLY-CLI', {
     font: 'ANSI Shadow',
     horizontalLayout: 'fitted',
   });
