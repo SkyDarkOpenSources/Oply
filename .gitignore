@@ -19,7 +19,7 @@
 
 # production
 /build
-/app
+.app/
 
 # misc
 .DS_Store
