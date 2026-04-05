@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "Oply",
+    "repository": "https://github.com/SkyDarkOpenSources/Oply.git",
+    "provider": "GITHUB",
+    "branch": "main"
+  },
+  "stack": {
+    "language": "unknown",
+    "framework": "unknown",
+    "packageManager": "unknown",
+    "hasDocker": false,
+    "hasK8s": false,
+    "hasTests": false,
+    "buildCommand": "",
+    "testCommand": "",
+    "lintCommand": "",
+    "startCommand": ""
+  },
+  "pipeline": {
+    "stages": []
+  },
+  "environments": [
+    "Development",
+    "Staging",
+    "Production"
+  ],
+  "ai": {
+    "autoFix": true,
+    "riskThreshold": 60
+  }
+}
