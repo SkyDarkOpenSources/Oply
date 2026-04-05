@@ -4,209 +4,30 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 /* ═══════════════════════════════════════════════════════════
-   Oply Landing Page — Marketing & Product Showcase
+   Oply Landing Page — Pure Information & CLI Documentation Focus
    ═══════════════════════════════════════════════════════════ */
 
-// Terminal animation lines
-const terminalLines = [
-  { text: "$ oply init --repo github.com/acme/api", delay: 0 },
-  { text: "✓ Repository connected. Scanning file structure...", delay: 800 },
-  { text: "✓ Detected: Node.js 22 / NestJS / PostgreSQL", delay: 1600 },
-  { text: "✓ AI generated pipeline: Lint → Test → Build → Deploy", delay: 2400 },
-  { text: "✓ Risk Score: 12/100 — Auto-approved for staging", delay: 3200 },
-  { text: "✓ Deployed to staging-cluster in 47s", delay: 4000 },
-  { text: "✓ Health checks passing. Zero downtime. ✨", delay: 4800 },
-];
-
-function AnimatedTerminal() {
-  const [visibleLines, setVisibleLines] = useState(0);
-
-  useEffect(() => {
-    const timers = terminalLines.map((line, i) =>
-      setTimeout(() => setVisibleLines(i + 1), line.delay)
-    );
-    const resetTimer = setTimeout(() => setVisibleLines(0), 7000);
-    const restartTimer = setTimeout(() => {
-      setVisibleLines(0);
-      // Restart animation
-    }, 7500);
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(resetTimer);
-      clearTimeout(restartTimer);
-    };
-  }, [visibleLines]);
-
-  useEffect(() => {
-    if (visibleLines === 0) {
-      const timer = setTimeout(() => setVisibleLines(1), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [visibleLines]);
-
-  return (
-    <div className="glass rounded-2xl overflow-hidden max-w-2xl w-full">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-        <div className="w-3 h-3 rounded-full bg-danger/80" />
-        <div className="w-3 h-3 rounded-full bg-warning/80" />
-        <div className="w-3 h-3 rounded-full bg-success/80" />
-        <span className="text-muted text-xs ml-2 font-mono">oply — pipeline</span>
-      </div>
-      <div className="p-5 font-mono text-sm space-y-1.5 min-h-[240px]">
-        {terminalLines.slice(0, visibleLines).map((line, i) => (
-          <div
-            key={i}
-            className="animate-fade-in"
-            style={{ animationDelay: `${i * 0.1}s` }}
-          >
-            {line.text.startsWith("$") ? (
-              <span className="text-muted">{line.text}</span>
-            ) : line.text.includes("✓") ? (
-              <span className="text-success">{line.text}</span>
-            ) : (
-              <span className="text-foreground">{line.text}</span>
-            )}
-          </div>
-        ))}
-        {visibleLines < terminalLines.length && (
-          <span className="inline-block w-2 h-4 bg-accent animate-blink" />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Pipeline DAG visualization
-function PipelineDAG() {
-  const nodes = [
-    { id: "lint", label: "Lint", status: "success", x: 50, y: 80 },
-    { id: "test", label: "Unit Test", status: "success", x: 220, y: 40 },
-    { id: "e2e", label: "E2E Test", status: "success", x: 220, y: 120 },
-    { id: "build", label: "Build", status: "running", x: 400, y: 80 },
-    { id: "scan", label: "Security", status: "pending", x: 570, y: 40 },
-    { id: "deploy", label: "Deploy", status: "pending", x: 570, y: 120 },
-  ];
-  const edges = [
-    [0, 1], [0, 2], [1, 3], [2, 3], [3, 4], [3, 5],
-  ];
-
-  return (
-    <svg viewBox="0 0 680 170" className="w-full max-w-3xl">
-      {/* Edges */}
-      {edges.map(([from, to], i) => (
-        <line
-          key={`e-${i}`}
-          x1={nodes[from].x + 60}
-          y1={nodes[from].y + 18}
-          x2={nodes[to].x}
-          y2={nodes[to].y + 18}
-          stroke={nodes[from].status === "success" ? "#10b981" : "#1e2235"}
-          strokeWidth={2}
-          strokeDasharray={nodes[from].status !== "success" ? "6 4" : "none"}
-        />
-      ))}
-      {/* Nodes */}
-      {nodes.map((node) => (
-        <g key={node.id}>
-          <rect
-            x={node.x}
-            y={node.y}
-            width={110}
-            height={36}
-            rx={10}
-            fill={
-              node.status === "success"
-                ? "rgba(16, 185, 129, 0.1)"
-                : node.status === "running"
-                ? "rgba(99, 102, 241, 0.15)"
-                : "rgba(18, 20, 28, 0.8)"
-            }
-            stroke={
-              node.status === "success"
-                ? "#10b981"
-                : node.status === "running"
-                ? "#6366f1"
-                : "#1e2235"
-            }
-            strokeWidth={1.5}
-          />
-          <circle
-            cx={node.x + 16}
-            cy={node.y + 18}
-            r={4}
-            fill={
-              node.status === "success"
-                ? "#10b981"
-                : node.status === "running"
-                ? "#6366f1"
-                : "#64748b"
-            }
-          >
-            {node.status === "running" && (
-              <animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite" />
-            )}
-          </circle>
-          <text
-            x={node.x + 30}
-            y={node.y + 22}
-            fill="#e2e8f0"
-            fontSize={13}
-            fontFamily="Inter, sans-serif"
-            fontWeight={500}
-          >
-            {node.label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-const features = [
-  {
-    icon: "🤖",
-    title: "AI Pipeline Generator",
-    description:
-      "Push code. Oply reads your repo, detects your stack, and generates an optimized build pipeline as a DAG. No YAML required.",
+const codeSnippet = `// oply.config.json (Auto-generated by AI)
+{
+  "version": "1.0",
+  "project": {
+    "name": "acme-api",
+    "provider": "GITHUB"
   },
-  {
-    icon: "🛡️",
-    title: "Deployment Risk Predictor",
-    description:
-      "Before every deploy, an AI model scores the risk (0–100) based on commit diff, test coverage, and failure history.",
+  "stack": {
+    "language": "TypeScript",
+    "framework": "NestJS",
+    "packageManager": "pnpm"
   },
-  {
-    icon: "🔧",
-    title: "Auto-Fix Engine",
-    description:
-      "When builds fail, the Failure Analysis AI reads your logs and git diff, then generates a patch or fix command automatically.",
-  },
-  {
-    icon: "☸️",
-    title: "Kubernetes Native",
-    description:
-      "Agent-based architecture deploys to any K8s cluster. Supports Canary, Blue/Green, and Rolling strategies out of the box.",
-  },
-  {
-    icon: "💬",
-    title: "AI Copilot",
-    description:
-      'An embedded DevOps assistant with full context — ask "Why is memory spiking in staging?" and get real answers.',
-  },
-  {
-    icon: "📊",
-    title: "Observability Hub",
-    description:
-      "Prometheus metrics, log aggregation, and service maps in one view. Auto-rollback when error rates spike.",
-  },
-];
-
-const stats = [
-  { value: "10×", label: "Faster Deployments" },
-  { value: "Zero", label: "YAML Written" },
-  { value: "99.9%", label: "Uptime SLA" },
-  { value: "<60s", label: "Avg Deploy Time" },
-];
+  "pipeline": {
+    "stages": [
+      { "id": "install", "command": "pnpm install" },
+      { "id": "lint", "command": "pnpm run lint", "dependsOn": ["install"] },
+      { "id": "test", "command": "pnpm test", "dependsOn": ["install"] },
+      { "id": "build", "command": "pnpm run build", "dependsOn": ["lint", "test"] }
+    ]
+  }
+}`;
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
@@ -218,381 +39,218 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0A0A0A] text-gray-200">
       {/* ─── Navbar ─────────────────────────────────────── */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled ? "glass py-3" : "py-5"
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
+          scrolled ? "bg-[#0A0A0A]/80 backdrop-blur-md border-white/10 py-3" : "bg-transparent border-transparent py-5"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">O</span>
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded shrink-0 bg-gradient-to-br from-[#00E5FF] to-[#007BFF] flex items-center justify-center shadow-[0_0_15px_rgba(0,229,255,0.4)] group-hover:shadow-[0_0_25px_rgba(0,229,255,0.6)] transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-black">
+                <path d="M 14 12 c -2.4 -3.2 -4.8 -4.8 -7.2 -4.8 a 4.8 4.8 0 1 0 0 9.6 c 2.4 0 4.8 -1.6 7.2 -4.8 Z M 14 12 c 1.6 2.13 3.2 3.2 4.8 3.2 a 3.2 3.2 0 1 0 0 -6.4 c -1.6 0 -3.2 1.07 -4.8 3.2 Z"/>
+              </svg>
             </div>
-            <span className="text-xl font-bold tracking-tight gradient-text">
+            <span className="text-xl font-semibold tracking-tight text-white">
               Oply
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-muted hover:text-foreground transition-colors">
+            <Link href="/docs" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+              Documentation
+            </Link>
+            <Link href="/docs/cli" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
+              CLI Reference
+            </Link>
+            <a href="#features" className="text-sm font-medium text-gray-400 hover:text-white transition-colors">
               Features
             </a>
-            <a href="#pipeline" className="text-sm text-muted hover:text-foreground transition-colors">
-              Pipeline
-            </a>
-            <Link href="/docs" className="text-sm text-muted hover:text-foreground transition-colors">
-              Docs
-            </Link>
-            <a href="#pricing" className="text-sm text-muted hover:text-foreground transition-colors">
-              Pricing
-            </a>
+          </div>
+          <div className="flex items-center gap-4">
             <a
               href="https://github.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-muted hover:text-foreground transition-colors"
+              className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
             >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
+              </svg>
               GitHub
             </a>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="btn-secondary text-sm !py-2 !px-4">
-              Sign In
-            </Link>
-            <Link href="/login" className="btn-primary text-sm !py-2 !px-4">
-              Get Started
-            </Link>
           </div>
         </div>
       </nav>
 
       {/* ─── Hero Section ───────────────────────────────── */}
-      <section className="relative pt-32 pb-20 overflow-hidden">
-        {/* Animated gradient orbs */}
-        <div className="absolute top-20 left-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[120px] animate-pulse-glow" />
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-600/10 rounded-full blur-[100px] animate-pulse-glow" style={{ animationDelay: "1s" }} />
+      <section className="relative pt-40 pb-20 overflow-hidden min-h-[90vh] border-b border-white/5">
+        {/* Glow Effects */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[#00E5FF]/50 to-transparent" />
+        <div className="absolute -top-[300px] left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[#00E5FF]/10 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center max-w-4xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-light text-sm text-muted mb-6">
-              <span className="status-dot status-success" />
-              Now in Public Beta — v1.0
+        <div className="max-w-7xl mx-auto px-6 relative z-10 grid lg:grid-cols-2 gap-16 items-center">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-8 backdrop-blur-sm shadow-sm ring-1 ring-white/5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse" />
+              Oply CLI v1.0.0 is now available
             </div>
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight mb-6">
-              <span className="text-foreground">Software Delivery,</span>
-              <br />
-              <span className="gradient-text">Fully Autonomous</span>
+            <h1 className="text-5xl md:text-7xl font-semibold tracking-tight text-white mb-6 leading-[1.1]">
+              Autonomous CI/CD. <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00E5FF] to-[#007BFF]">
+                Zero YAML.
+              </span>
             </h1>
-            <p className="text-lg md:text-xl text-muted max-w-2xl mx-auto leading-relaxed">
-              Oply is an AI-powered CI/CD platform that replaces YAML with
-              intelligence. Push code and watch an AI engine build, test, deploy,
-              monitor, and self-heal — autonomously.
+            <p className="text-lg md:text-xl text-gray-400 mb-10 leading-relaxed font-light max-w-xl">
+              An intelligent command-line tool that reads your code, detects your stack, and generates the perfect pipeline graph automatically. Designed for the terminal.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
-              <Link href="/login" className="btn-primary text-base !py-3 !px-8">
-                Start Deploying Free →
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <Link href="/docs" className="h-12 px-8 rounded-lg bg-white text-black font-semibold flex items-center justify-center hover:bg-gray-100 transition-colors">
+                Read the Docs
               </Link>
-              <a
-                href="#pipeline"
-                className="btn-secondary text-base !py-3 !px-8"
-              >
-                Watch It Work
-              </a>
-            </div>
-          </div>
-
-          {/* Animated Terminal */}
-          <div className="flex justify-center">
-            <AnimatedTerminal />
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Stats Bar ──────────────────────────────────── */}
-      <section className="py-12 border-y border-border">
-        <div className="max-w-5xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((stat, i) => (
-            <div key={i} className="text-center">
-              <div className="text-3xl md:text-4xl font-bold gradient-text-accent mb-2">
-                {stat.value}
+              <div className="h-12 px-6 rounded-lg bg-[#111111] border border-white/10 flex items-center gap-3 w-full sm:w-auto">
+                <span className="text-gray-500 font-mono">$</span>
+                <code className="text-sm font-mono text-gray-300">npm install -g oply-cli</code>
+                <button className="ml-auto text-gray-500 hover:text-white transition-colors" title="Copy to clipboard">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
               </div>
-              <div className="text-sm text-muted">{stat.label}</div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── Pipeline Visualization ─────────────────────── */}
-      <section id="pipeline" className="py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Dynamic Execution Graph
-            </h2>
-            <p className="text-muted text-lg max-w-2xl mx-auto">
-              No static YAML. Oply&apos;s AI generates a DAG — a directed
-              acyclic graph — tailored to your repository. Each node executes in
-              parallel when dependencies allow.
-            </p>
           </div>
-          <div className="flex justify-center glass rounded-2xl p-10">
-            <PipelineDAG />
+
+          <div className="relative">
+            <div className="absolute -inset-1 bg-gradient-to-r from-[#00E5FF]/20 to-[#007BFF]/20 rounded-2xl blur-xl transition-all group-hover:blur-2xl" />
+            <div className="relative bg-[#0A0A0A] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+              <div className="px-4 py-3 border-b border-white/5 bg-[#111111] flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50" />
+                <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
+                <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
+                <span className="ml-2 text-xs font-mono text-gray-500">oply.config.json</span>
+              </div>
+              <div className="p-6 overflow-x-auto text-sm font-mono leading-relaxed bg-[#0A0A0A]">
+                <pre>
+                  <code className="text-[#00E5FF]">
+                    {codeSnippet}
+                  </code>
+                </pre>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ─── Features Grid ──────────────────────────────── */}
-      <section id="features" className="py-24 bg-surface/30">
+      <section id="features" className="py-32 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Built for Serious Engineering
-            </h2>
-            <p className="text-muted text-lg max-w-2xl mx-auto">
-              Every feature is designed by engineers, for engineers. From AI
-              pipeline generation to automatic rollbacks.
-            </p>
+          <div className="mb-16 max-w-2xl">
+            <h2 className="text-3xl font-semibold text-white mb-4 tracking-tight">Code Intelligence Engine</h2>
+            <p className="text-gray-400 text-lg">Oply isn&apos;t just a task runner. It understands your codebase and infers what needs to be run, in what order, and with what risk.</p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((f, i) => (
-              <div
-                key={i}
-                className="glass rounded-2xl p-6 hover:border-accent/30 transition-all duration-300 group cursor-default"
-              >
-                <div className="text-3xl mb-4">{f.icon}</div>
-                <h3 className="text-lg font-semibold mb-2 group-hover:text-accent transition-colors">
-                  {f.title}
-                </h3>
-                <p className="text-sm text-muted leading-relaxed">
-                  {f.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* ─── How It Works ───────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Three Steps to Autonomous
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "01",
-                title: "Connect Repository",
-                desc: "Link your GitHub, GitLab, or Bitbucket repo. Oply installs a webhook and scans your codebase.",
-              },
-              {
-                step: "02",
-                title: "AI Generates Pipeline",
-                desc: "Our AI reads your lockfiles, Dockerfiles, and config to build an optimized execution graph.",
-              },
-              {
-                step: "03",
-                title: "Push & Deploy",
-                desc: "Every commit triggers the pipeline. AI scores risk, deploys to K8s, and auto-heals failures.",
-              },
-            ].map((item, i) => (
-              <div key={i} className="relative">
-                <div className="text-6xl font-black text-accent/10 mb-2">
-                  {item.step}
-                </div>
-                <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-muted leading-relaxed">
-                  {item.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── Pricing ────────────────────────────────────── */}
-      <section id="pricing" className="py-24 bg-surface/30">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, Transparent Pricing
-            </h2>
-          </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                name: "Open Source",
-                price: "Free",
-                desc: "For side projects and OSS",
-                features: [
-                  "3 Projects",
-                  "AI Pipeline Generation",
-                  "Community Support",
-                  "Docker Builds",
-                  "Basic Logs",
-                ],
-                cta: "Get Started",
-                highlighted: false,
+                icon: (
+                  <svg className="w-6 h-6 text-[#00E5FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                ),
+                title: "Automatic Stack Detection",
+                desc: "Analyzes package.json, go.mod, Cargo.toml etc. to generate the correct build and test commands without human intervention."
               },
               {
-                name: "Pro",
-                price: "$49",
-                desc: "For growing teams",
-                features: [
-                  "Unlimited Projects",
-                  "AI Copilot & Auto-Fix",
-                  "Risk Prediction",
-                  "Multi-Env Kubernetes",
-                  "Priority Support",
-                  "Advanced Observability",
-                ],
-                cta: "Start Free Trial",
-                highlighted: true,
+                icon: (
+                  <svg className="w-6 h-6 text-[#00E5FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                ),
+                title: "AI Risk Prediction",
+                desc: "Uses GPT-4o to analyze git diffs before deployment, assigning a risk score (0-100) and preventing dangerous production rollouts."
               },
               {
-                name: "Enterprise",
-                price: "Custom",
-                desc: "For organizations at scale",
-                features: [
-                  "Everything in Pro",
-                  "Self-Hosted / Air-Gapped",
-                  "RBAC & SSO / SAML",
-                  "Custom AI Model (BYO LLM)",
-                  "SLA & Dedicated Support",
-                  "Multi-Cloud Federation",
-                ],
-                cta: "Contact Sales",
-                highlighted: false,
-              },
-            ].map((plan, i) => (
-              <div
-                key={i}
-                className={`rounded-2xl p-8 flex flex-col ${
-                  plan.highlighted
-                    ? "glass glow-accent border-accent/30"
-                    : "glass"
-                }`}
-              >
-                <h3 className="text-lg font-semibold mb-1">{plan.name}</h3>
-                <div className="text-3xl font-bold mb-1">
-                  {plan.price}
-                  {plan.price !== "Free" && plan.price !== "Custom" && (
-                    <span className="text-sm text-muted font-normal">
-                      /month
-                    </span>
-                  )}
+                icon: (
+                  <svg className="w-6 h-6 text-[#00E5FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                ),
+                title: "Terminal Native copilot",
+                desc: "Run `oply ai-debug` to start a chat session right in your terminal. It reads your logs, views failure contexts, and tells you exactly how to fix it."
+              }
+            ].map((f, i) => (
+              <div key={i} className="group p-8 rounded-2xl bg-[#111111] border border-white/5 hover:border-[#00E5FF]/30 transition-all duration-300">
+                <div className="w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  {f.icon}
                 </div>
-                <p className="text-sm text-muted mb-6">{plan.desc}</p>
-                <ul className="space-y-3 mb-8 flex-1">
-                  {plan.features.map((f, j) => (
-                    <li key={j} className="flex items-center gap-2 text-sm">
-                      <span className="text-success">✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  href="/login"
-                  className={`text-center rounded-xl py-2.5 font-medium text-sm transition-all ${
-                    plan.highlighted
-                      ? "btn-primary !rounded-xl"
-                      : "btn-secondary !rounded-xl"
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
+                <h3 className="text-xl font-medium text-white mb-3">{f.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── CTA ────────────────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Stop Writing YAML.
-            <br />
-            <span className="gradient-text">Start Shipping.</span>
-          </h2>
-          <p className="text-muted text-lg mb-8 max-w-xl mx-auto">
-            Join thousands of engineers who replaced fragile CI/CD configs with
-            an AI that understands their code.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/login" className="btn-primary text-base !py-3 !px-8">
-              Deploy Your First Project →
-            </Link>
+      {/* ─── Command Breakdown ──────────────────────────── */}
+      <section className="py-32 border-y border-white/5 bg-[#00E5FF]/[0.02]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="mb-16">
+            <h2 className="text-3xl font-semibold text-white mb-4">Complete Local Workflow</h2>
+            <p className="text-gray-400 text-lg max-w-2xl">Everything runs on your machine or CI runner. The CLI manages a local `.oply/` store to track deployments and runs seamlessly across environments.</p>
           </div>
-          <p className="text-xs text-muted mt-4">
-            Free tier. No credit card required.
-          </p>
+
+          <div className="grid md:grid-cols-2 gap-12 items-start">
+            <div className="space-y-6">
+              {[
+                { cmd: "oply init", desc: "Initialize repo, detect stack, generate DAG" },
+                { cmd: "oply pipeline trigger", desc: "Execute the dependency-aware execution graph" },
+                { cmd: "oply deploy --env staging", desc: "Build Docker images, execute K8s deployments" },
+                { cmd: "oply status", desc: "View git status, run history, and active deployments" },
+                { cmd: "oply rollback --from k8s", desc: "Surgically undo changes locally & remotely" },
+              ].map((item, i) => (
+                <div key={i} className="flex gap-4 p-4 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors">
+                  <div className="font-mono text-[#00E5FF] text-sm shrink-0 mt-0.5">$ {item.cmd}</div>
+                  <div className="text-gray-400 text-sm">{item.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5 bg-[#111111] flex items-center justify-between">
+                <div className="text-xs font-mono text-gray-500">Terminal</div>
+              </div>
+              <div className="p-6 font-mono text-sm leading-relaxed text-gray-300">
+                <div className="text-gray-500">$ oply status</div>
+                <div className="mt-2">📋 <span className="text-white">Git Stage — acme-api (main)</span></div>
+                <div className="text-gray-500">  HEAD: a1b2c3d ↑2</div>
+                <br />
+                <div>Environments:</div>
+                <div className="flex gap-4 mt-1"><span className="text-green-400">✓</span> <span className="text-[#00E5FF]">development</span> <span className="text-gray-500">(commit a1b2c3d, 2m ago)</span></div>
+                <div className="flex gap-4 mt-1"><span className="text-green-400">✓</span> <span className="text-[#00E5FF]">staging    </span> <span className="text-gray-500">(commit e9f8g7h, 4h ago)</span></div>
+                <div className="flex gap-4 mt-1"><span className="text-yellow-400">●</span> <span className="text-[#00E5FF]">production </span> <span className="text-gray-500">(deploying...)</span></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ─── Footer ─────────────────────────────────────── */}
-      <footer className="border-t border-border py-12">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent to-purple-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">O</span>
-                </div>
-                <span className="text-lg font-bold gradient-text">Oply</span>
-              </div>
-              <p className="text-xs text-muted leading-relaxed">
-                Autonomous Software Delivery.
-                <br />
-                AI-powered. Zero-YAML.
-              </p>
+      <footer className="py-12 border-t border-white/10 bg-[#0A0A0A]">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded bg-[#0A0A0A] border border-white/20 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-white">
+                <path d="M 14 12 c -2.4 -3.2 -4.8 -4.8 -7.2 -4.8 a 4.8 4.8 0 1 0 0 9.6 c 2.4 0 4.8 -1.6 7.2 -4.8 Z M 14 12 c 1.6 2.13 3.2 3.2 4.8 3.2 a 3.2 3.2 0 1 0 0 -6.4 c -1.6 0 -3.2 1.07 -4.8 3.2 Z"/>
+              </svg>
             </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-3">Product</h4>
-              <ul className="space-y-2 text-sm text-muted">
-                <li><a href="#features" className="hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#pipeline" className="hover:text-foreground transition-colors">Pipeline Engine</a></li>
-                <li><Link href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-3">Resources</h4>
-              <ul className="space-y-2 text-sm text-muted">
-                <li><a href="#" className="hover:text-foreground transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">API Reference</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">CLI Guide</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Changelog</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold mb-3">Company</h4>
-              <ul className="space-y-2 text-sm text-muted">
-                <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
-              </ul>
-            </div>
+            <span className="text-sm font-semibold text-gray-300">Oply CLI</span>
           </div>
-          <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-border">
-            <p className="text-xs text-muted">
-              © {new Date().getFullYear()} Oply. All rights reserved.
-            </p>
-            <div className="flex gap-6 mt-4 md:mt-0">
-              <a href="#" className="text-xs text-muted hover:text-foreground transition-colors">
-                Privacy
-              </a>
-              <a href="#" className="text-xs text-muted hover:text-foreground transition-colors">
-                Terms
-              </a>
-              <a href="#" className="text-xs text-muted hover:text-foreground transition-colors">
-                Security
-              </a>
-            </div>
+          
+          <div className="flex items-center gap-6">
+            <Link href="/docs" className="text-sm text-gray-500 hover:text-white transition-colors">Documentation</Link>
+            <Link href="/docs/cli" className="text-sm text-gray-500 hover:text-white transition-colors">API & CLI</Link>
+            <a href="https://github.com" className="text-sm text-gray-500 hover:text-white transition-colors">GitHub</a>
           </div>
         </div>
       </footer>

@@ -1,111 +1,109 @@
+import { PageHeader, Callout, CardGrid, Card, CodeBlock } from "@/components/DocsUI";
+
 export default function DocsArchitecturePage() {
   return (
-    <div className="space-y-12 pb-20">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-extrabold tracking-tight">System Architecture</h1>
-        <p className="text-xl text-muted-foreground leading-relaxed">
-          Oply is built on a distributed, event-driven architecture designed for extreme reliability and autonomous operations.
-        </p>
+    <div className="pb-20 animate-fade-in">
+      <PageHeader 
+        title="Core Architecture" 
+        description="Oply is built on an event-driven, fully autonomous execution lifecycle. Unlike traditional server-heavy CI/CD systems, Oply relies on the intelligence of its CLI and Git integrators." 
+      />
+
+      <hr className="border-white/10 my-10" />
+
+      {/* ─── Zero YAML & The DAG ───────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">1. The 'Zero YAML' Philosophy</h2>
+      <p className="text-gray-300 text-lg mb-6">
+        When a developer initializes Oply via <code className="text-[#00E5FF] font-mono text-sm">oply init</code>, the CLI does not ask for a massive pipeline script. Instead, it delegates discovery to a localized intelligence module.
+      </p>
+      
+      <CardGrid>
+        <Card 
+          title="Stack Inference" 
+          description="The Engine scans your directory tree. If it spots a 'package.json' alongside a 'next.config.js', it automatically pulls the 'Next.js' optimal build parameters. If it spots a 'go.mod', it flags it as a Golang binary build." 
+        />
+        <Card 
+          title="Topological Sorting" 
+          description="Build dependencies are sorted before anything runs. 'LINT' and 'TEST' stages are strictly evaluated before 'BUILD'. If Docker is detected, the containerization step gets tacked to the end." 
+        />
+      </CardGrid>
+
+      <Callout type="info" title="The Abstract Syntax Tree (AST) of Dev">
+        Oply doesn't run sequential scripts. It runs an acyclic graph. If 'lint' and 'test' don't depend on each other, they are executed in parallel background workers.
+      </Callout>
+
+      <hr className="border-white/10 my-10" />
+
+      {/* ─── The Execution Lifecycle ───────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">2. The Execution Lifecycle</h2>
+      <p className="text-gray-300 text-lg mb-8">
+        Once <code className="text-[#00E5FF] font-mono text-sm">oply deploy</code> is triggered, the system invokes the four distinct stages of the Local Pipeline Engine.
+      </p>
+
+      <div className="bg-[#111111] p-8 rounded-xl border border-white/10 relative overflow-hidden mb-12">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-[#00E5FF]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+        
+        <div className="space-y-8 relative z-10">
+          <div className="flex gap-6">
+            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center font-mono text-sm shrink-0">01</div>
+            <div>
+              <h3 className="text-xl font-medium text-white mb-2">Pre-Flight Risk AI</h3>
+              <p className="text-gray-400 leading-relaxed text-sm">Oply extracts the `git diff` output from your most recent commit and sends it to the AI Sentinel. The GPT model analyzes semantic changes, test coverage, and evaluates if the rollout poses a High Risk. If `riskThreshold &gt; 80`, it halts execution.</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-6">
+            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center font-mono text-sm shrink-0">02</div>
+            <div>
+              <h3 className="text-xl font-medium text-white mb-2">Stage Execution (Graph Check)</h3>
+              <p className="text-gray-400 leading-relaxed text-sm">The CLI processes the local `oply.config.json` graph. Testing is executed natively using the installed binary environment (e.g. `npm run test` or `cargo test`). If the `--skip-build` flag is passed, the build step is skipped.</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-6">
+            <div className="w-10 h-10 rounded-full bg-[#00E5FF]/20 border border-[#00E5FF]/30 text-[#00E5FF] flex items-center justify-center font-mono text-sm shrink-0 shadow-[0_0_15px_rgba(0,229,255,0.2)]">03</div>
+            <div>
+              <h3 className="text-xl font-medium text-white mb-2">Docker & K8s Connection</h3>
+              <p className="text-gray-400 leading-relaxed text-sm">If successful, the engine builds the artifact using Docker caching. The newly generated tag (e.g., `acme-api:a1b2c3d`) is pushed to the remote registry and swapped into the local Kubernetes configuration manifest.</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-6">
+            <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center font-mono text-sm shrink-0">04</div>
+            <div>
+              <h3 className="text-xl font-medium text-white mb-2">Telemetrics Sync</h3>
+              <p className="text-gray-400 leading-relaxed text-sm">The duration, log stream mapping, and end state are flushed to the local `.oply/history.json` datastore and `.oply/current.json` becomes the new active state.</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <hr className="border-border" />
+      <hr className="border-white/10 my-10" />
 
-      {/* Core Philosophies */}
-      <section className="space-y-8 mt-12">
-        <h2 className="text-2xl font-bold">Core Philosophies</h2>
-        
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="glass p-6 rounded-xl border border-border">
-            <h3 className="text-lg font-semibold mb-2">Zero YAML</h3>
-            <p className="text-sm text-muted-foreground">
-              We believe developers should focus on code, not configuration. Oply uses LLMs to derive the optimal build and test graphs directly from your source files.
-            </p>
-          </div>
-          <div className="glass p-6 rounded-xl border border-border">
-            <h3 className="text-lg font-semibold mb-2">Autonomous Healing</h3>
-            <p className="text-sm text-muted-foreground">
-              When a deployment fails health checks, Oply doesn't just alert you. It analyzes the logs, identifies the breaking change, and auto-initiates a surgical rollback.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* ─── AI Integrations ───────────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">3. Deep AI Integrations</h2>
+      <p className="text-gray-300 text-lg mb-8">
+        There is no single "AI Wrapper". The Intelligence module routes discrete tasks to specialized LLM prompts natively living in the CLI tool source code.
+      </p>
 
-      {/* Execution Layer */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">The Execution Layer</h2>
-        <p className="text-muted-foreground">
-          Oply pipelines are executed across a pool of ephemeral workers. Each task in the DAG runs in an isolated container environment.
-        </p>
-        <div className="glass bg-black/50 p-6 rounded-xl border border-border mt-6">
-          <h4 className="text-sm font-bold text-accent mb-4 uppercase tracking-widest text-xs">Task Lifecycle</h4>
-          <ol className="space-y-4">
-            <li className="flex gap-4">
-              <span className="text-muted font-mono text-xs">01</span>
-              <p className="text-sm">Webhook triggers control plane via GitHub/GitLab events.</p>
-            </li>
-            <li className="flex gap-4">
-              <span className="text-muted font-mono text-xs">02</span>
-              <p className="text-sm">Orchestrator generates a specific Run instance from the Workflow DAG.</p>
-            </li>
-            <li className="flex gap-4">
-              <span className="text-muted font-mono text-xs">03</span>
-              <p className="text-sm">Tasks are dispatched to the Redis-backed BullMQ cluster.</p>
-            </li>
-            <li className="flex gap-4">
-              <span className="text-muted font-mono text-xs">04</span>
-              <p className="text-sm">Worker nodes pick up tasks, execute commands, and stream logs via WebSockets.</p>
-            </li>
-          </ol>
-        </div>
-      </section>
+      <CodeBlock 
+        language="js" 
+        title="cli/src/commands/ai-debug.js"
+        code={`// Example interaction flow internally executed by the AI Debug Engine
+async function analyzeFailure(logString) {
+  const diff = getRecentDiff(process.cwd());
+  
+  const instruction = \`
+    You are an expert DevOps engineer specializing in K8s and Docker.
+    The pipeline failed with the following traceback: \${logString}.
+    The recent codebase changes are: \${diff}.
 
-      {/* AI Subsystems */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">AI Subsystems</h2>
-        <p className="text-muted-foreground">
-          Oply integrates four distinct AI agents throughout the delivery lifecycle:
-        </p>
-        <div className="grid gap-4 mt-4">
-          {[
-            { name: "The Architect", duty: "Generates optimal pipeline DAGs from repo scans." },
-            { name: "The Sentinel", duty: "Predicts deployment risk scores before every rollout." },
-            { name: "The Analyst", duty: "Deconstructs build failures and suggests code fixes." },
-            { name: "The Copilot", duty: "Interactive DevOps expert available via Chat or CLI." }
-          ].map((agent, i) => (
-            <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-surface-hover border border-border">
-              <div className="w-2 h-2 rounded-full bg-accent glow-accent-sm" />
-              <div className="flex-1">
-                <span className="font-semibold text-sm mr-2">{agent.name}:</span>
-                <span className="text-sm text-muted-foreground">{agent.duty}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+    Provide the exact terminal command string required to fix this problem.
+  \`;
 
-      {/* Project Structure */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Project Structure</h2>
-        <p className="text-muted-foreground">
-          Oply is organized as a monorepo containing the dashboard app and the CLI tool.
-        </p>
-        <div className="glass p-6 rounded-xl border border-border bg-surface mt-4">
-          <pre className="text-xs font-mono text-muted-foreground leading-relaxed">
-{`Oply/
-├── app/                  # Next.js Dashboard & API Gateway
-│   ├── app/              # App Router (Dashboard, Docs, API)
-│   ├── components/       # Shared UI Components
-│   ├── lib/              # Drizzle ORM, AI Prompts, Auth
-│   └── public/           # Static Assets
-├── cli/                  # Oply Node.js CLI Tool
-│   ├── bin/              # CLI Entry Point
-│   ├── src/              # Command Implementation (Docker, K8s, AI)
-│   └── package.json      # CLI Metadata & Dependencies
-├── docs/                 # Raw Architecture & Design Blueprints
-└── README.md             # Project Introduction & Quickstart`}
-          </pre>
-        </div>
-      </section>
+  return GPT.generateCommand(instruction);
+}`}
+      />
+
     </div>
   );
 }

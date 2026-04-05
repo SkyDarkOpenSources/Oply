@@ -1,123 +1,113 @@
+import { PageHeader, Callout, CardGrid, Card, CodeBlock } from "@/components/DocsUI";
+
 export default function DocsCliPage() {
   return (
-    <div className="space-y-12 pb-20">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-extrabold tracking-tight">Oply CLI Reference</h1>
-        <p className="text-xl text-muted-foreground leading-relaxed">
-          The Oply CLI is the command-line interface for the Autonomous Software Delivery Platform. It allows you to initialize projects, trigger pipelines, interactive AI debugging, and run K8S/Docker operations directly from your terminal.
-        </p>
-      </div>
+    <div className="pb-20 animate-fade-in">
+      <PageHeader 
+        title="CLI Reference" 
+        description="The terminal is your primary interface with Oply. The Node.js-based CLI handles everything from stack detection to rolling out Kubernetes updates." 
+      />
 
-      <hr className="border-border" />
+      <hr className="border-white/10 my-10" />
 
-      {/* Global Options */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Global Installation</h2>
-        <div className="glass bg-black rounded-lg p-4 border border-border">
-          <code className="text-sm font-mono text-accent">npm install -g oply-cli</code>
-          <p className="text-sm text-muted-foreground mt-4">
-            If you are running from the source repository, navigate into <code className="text-accent bg-accent/10 px-1 py-0.5 rounded">/cli</code> and use <code className="text-accent bg-accent/10 px-1 py-0.5 rounded">node bin/oply.js</code>.
-          </p>
-        </div>
-      </section>
+      {/* Global Flags */}
+      <h2 className="text-2xl font-semibold text-white mb-6">Installation & Globals</h2>
+      
+      <CodeBlock 
+        language="bash"
+        title="Terminal"
+        code="git clone https://github.com/SkyDarkOpenSources/oply.git"
+      />
+      
+      <Callout type="info" title="DEVELOPER BUILD">
+        If you are running the cli from the source monorepo, you must navigate into the <code className="text-[#00E5FF] px-1 rounded bg-[#00E5FF]/10 text-xs">/cli</code> directory and invoke <code className="text-[#00E5FF] px-1 rounded bg-[#00E5FF]/10 text-xs">node bin/oply.js</code> natively instead of using the global binary.
+      </Callout>
 
-      {/* Commands List */}
-      <section className="space-y-8 mt-12">
-        <h2 className="text-2xl font-bold">Commands</h2>
+      <hr className="border-white/10 my-10" />
 
+      {/* ─── Commands List ─────────────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-8">Base Commands</h2>
+
+      <div className="space-y-12">
+        
         {/* oply init */}
-        <div className="glass p-6 rounded-xl border border-border space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xl font-semibold"><code className="text-accent">oply init</code></h3>
-            <span className="text-xs font-mono bg-surface-hover px-2 py-1 rounded text-muted-foreground">Setup</span>
+        <div className="border border-white/10 rounded-xl bg-[#111111]/50 overflow-hidden group hover:border-[#00E5FF]/30 transition-colors">
+          <div className="bg-[#1A1A1A] px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold font-mono text-white m-0">oply init</h3>
+            <span className="text-xs bg-white/10 text-gray-300 px-2 py-1 rounded">Configuration</span>
           </div>
-          <p className="text-sm text-foreground">Scans the repository, detects the language & framework, and uses AI to generate an optimal pipeline DAG (oply.config.json).</p>
-          <div className="bg-black/50 p-4 rounded-lg border border-border font-mono text-sm space-y-2 text-muted-foreground">
-            <div>$ oply init --repo github.com/user/project --name my-project</div>
+          <div className="p-6">
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              Interactively scans the current directory to establish the `oply.config.json` graph, hooks into Git, and writes an ignored `.env.oply` secrets file.
+            </p>
+            <CodeBlock language="bash" code="$ oply init -n acme-api --repo https://github.com/org/repo" />
+            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4 mt-6">Available Flags</h4>
+            <ul className="space-y-3 text-sm text-gray-400 list-disc pl-5">
+              <li><code className="text-[#00E5FF] font-mono mr-2">-r, --repo &lt;url&gt;</code> Specify the GitHub/GitLab repository URL manually.</li>
+              <li><code className="text-[#00E5FF] font-mono mr-2">-n, --name &lt;name&gt;</code> The arbitrary name of the project.</li>
+              <li><code className="text-[#00E5FF] font-mono mr-2">--api &lt;url&gt;</code> Connect the CLI to an upstream telemetry API (Default: localhost).</li>
+            </ul>
           </div>
         </div>
 
         {/* oply deploy */}
-        <div className="glass p-6 rounded-xl border border-border space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xl font-semibold"><code className="text-accent">oply deploy</code></h3>
-            <span className="text-xs font-mono bg-surface-hover px-2 py-1 rounded text-muted-foreground">Deployment</span>
+        <div className="border border-white/10 rounded-xl bg-[#111111]/50 overflow-hidden group hover:border-[#00E5FF]/30 transition-colors">
+          <div className="bg-[#1A1A1A] px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold font-mono text-white m-0">oply deploy</h3>
+            <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-1 rounded">Execution</span>
           </div>
-          <p className="text-sm text-foreground">Triggers deployments to specific environments. Automates Docker build/push, executes tests, computes AI risk scores, and connects to K8s for the rollout.</p>
-          <div className="bg-black/50 p-4 rounded-lg border border-border font-mono text-sm space-y-2 text-muted-foreground overflow-x-auto">
-            <div>$ oply deploy --env staging --strategy canary</div>
-            <div>$ oply deploy --env production --skip-build --image my-app:latest</div>
+          <div className="p-6">
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              Triggers the pipeline execution. Recomputes dependencies, packages Docker images, and requests scaling operations to Kubernetes. Includes inherent 'Production Safety Checks' to prevent disastrous overwrites.
+            </p>
+            <CodeBlock language="bash" code="$ oply deploy --env production --skip-tests --strategy canary" />
+            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4 mt-6">Available Flags</h4>
+            <ul className="space-y-3 text-sm text-gray-400 list-disc pl-5">
+              <li><code className="text-[#00E5FF] font-mono mr-2">-e, --env &lt;env&gt;</code> Target semantic environment designation (development, staging, production).</li>
+              <li><code className="text-[#00E5FF] font-mono mr-2">-s, --strategy &lt;type&gt;</code> Force strategy type: 'rolling', 'canary', 'blue-green'.</li>
+              <li><code className="text-[#00E5FF] font-mono mr-2">--dry-run</code> Calculates the final rollout manifest without executing writes.</li>
+              <li><code className="text-[#00E5FF] font-mono mr-2">--skip-build / --skip-tests</code> Bypasses DAG stages manually for emergency fixes.</li>
+            </ul>
           </div>
         </div>
 
         {/* oply status */}
-        <div className="glass p-6 rounded-xl border border-border space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xl font-semibold"><code className="text-accent">oply status</code></h3>
-            <span className="text-xs font-mono bg-surface-hover px-2 py-1 rounded text-muted-foreground">Monitoring</span>
+        <div className="border border-white/10 rounded-xl bg-[#111111]/50 overflow-hidden group hover:border-[#00E5FF]/30 transition-colors">
+          <div className="bg-[#1A1A1A] px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <h3 className="text-xl font-bold font-mono text-white m-0">oply status</h3>
+            <span className="text-xs bg-white/10 text-gray-300 px-2 py-1 rounded">Telemetry</span>
           </div>
-          <p className="text-sm text-foreground">View pipeline run statuses and currently active deployments.</p>
-          <div className="bg-black/50 p-4 rounded-lg border border-border font-mono text-sm space-y-2 text-muted-foreground overflow-x-auto">
-            <div>$ oply status</div>
-            <div>$ oply status --deployments --limit 5</div>
+          <div className="p-6">
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              Reads local pointers and active deployment metrics without hitting any external servers except the active k8s cluster.
+            </p>
+            <CodeBlock language="bash" code="$ oply status --deployments --limit 5" />
           </div>
         </div>
 
         {/* oply ai-debug */}
-        <div className="glass p-6 rounded-xl border border-border border-l-4 border-l-accent space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xl font-semibold"><code className="text-accent">oply ai-debug</code></h3>
-            <span className="text-xs font-mono bg-accent/20 text-accent px-2 py-1 rounded flex gap-1 items-center">✨ AI Feature</span>
+        <div className="border border-[#00E5FF]/30 rounded-xl bg-[#00E5FF]/[0.02] overflow-hidden group relative">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#00E5FF]" />
+          <div className="bg-[#00E5FF]/5 px-6 py-4 border-b border-[#00E5FF]/20 flex items-center justify-between">
+            <h3 className="text-xl font-bold font-mono text-white m-0 flex items-center gap-2">
+              <svg className="w-5 h-5 text-[#00E5FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              oply ai-debug
+            </h3>
+            <span className="text-xs bg-[#00E5FF]/20 text-[#00E5FF] px-2 py-1 rounded font-semibold tracking-wider">PREMIUM</span>
           </div>
-          <p className="text-sm text-foreground">Starts an interactive session with the AI Failure Analyzer. Oply will scan your logs, read git diffs, determine root causes, and suggest exact terminal commands to fix issues.</p>
-          <div className="bg-black/50 p-4 rounded-lg border border-border font-mono text-sm space-y-2 text-muted-foreground overflow-x-auto">
-            <div>$ oply ai-debug</div>
-            <div>$ oply ai-debug --error "npm ERR! ERESOLVE unable to resolve dependency tree"</div>
-            <div>$ oply ai-debug --logs ./failed-build.log</div>
+          <div className="p-6">
+            <p className="text-gray-400 text-sm mb-6 leading-relaxed">
+              Starts an interactive terminal session where you chat with the failure analyzer. Highly context-aware based on the current process exit codes.
+            </p>
+            <CodeBlock language="bash" code={`# Inject manual string error
+$ oply ai-debug --error "npm ERR! ERESOLVE unable to resolve dependency tree"
+
+# Parse physical dump
+$ oply ai-debug --logs ./failed-build.log`} />
           </div>
         </div>
 
-        {/* oply logs */}
-        <div className="glass p-6 rounded-xl border border-border space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xl font-semibold"><code className="text-accent">oply logs</code></h3>
-            <span className="text-xs font-mono bg-surface-hover px-2 py-1 rounded text-muted-foreground">Monitoring</span>
-          </div>
-          <p className="text-sm text-foreground">Interactive log viewer allowing you to tail logs from CI/CD pipeline runs, Docker containers, or Kubernetes pods.</p>
-          <div className="bg-black/50 p-4 rounded-lg border border-border font-mono text-sm space-y-2 text-muted-foreground overflow-x-auto">
-            <div>$ oply logs</div>
-            <div>$ oply logs --pod --namespace staging -f</div>
-          </div>
-        </div>
-
-        {/* Sub-group k8s */}
-        <div className="space-y-4 pt-4 border-t border-border">
-          <h3 className="text-lg font-bold">Kubernetes & Docker Commands</h3>
-        </div>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-           <div className="glass p-5 rounded-xl border border-border space-y-3">
-             <h4 className="font-semibold text-lg"><code className="text-accent">oply k8s *</code></h4>
-             <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
-               <li><code className="text-foreground">k8s status</code> - Cluster nodes and basic info</li>
-               <li><code className="text-foreground">k8s scale -r 5</code> - Scale deployments</li>
-               <li><code className="text-foreground">k8s rollout</code> - Deployment rollout status</li>
-               <li><code className="text-foreground">k8s events</code> - View recent K8s events</li>
-             </ul>
-           </div>
-           
-           <div className="glass p-5 rounded-xl border border-border space-y-3">
-             <h4 className="font-semibold text-lg"><code className="text-accent">oply docker *</code></h4>
-             <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
-               <li><code className="text-foreground">docker build/push</code> - Manage images</li>
-               <li><code className="text-foreground">docker ps</code> - Container statuses</li>
-               <li><code className="text-foreground">docker scan</code> - Trivy security scans</li>
-               <li><code className="text-foreground">docker prune</code> - Clean unused resources</li>
-             </ul>
-           </div>
-        </div>
-
-      </section>
+      </div>
     </div>
   );
 }

@@ -1,143 +1,72 @@
-export default function DocsApiPage() {
+import { PageHeader, Callout, CodeBlock } from "@/components/DocsUI";
+
+export default function DocsStorePage() {
   return (
-    <div className="space-y-12 pb-20">
-      <div className="space-y-4">
-        <h1 className="text-4xl font-extrabold tracking-tight">API Reference</h1>
-        <p className="text-xl text-muted-foreground leading-relaxed">
-          The Oply platform exposes a robust HTTP API for triggering CI/CD pipelines, managing infrastructure, and streaming AI assistant capabilities.
-        </p>
-      </div>
+    <div className="pb-20 animate-fade-in">
+      <PageHeader 
+        title="Store Architecture" 
+        description="Oply operates on a completely local, git-integrated state model. Instead of relying on a centralized database, your repository is your source of truth." 
+      />
 
-      <hr className="border-border" />
+      <hr className="border-white/10 my-10" />
 
-      {/* Authentication */}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Authentication</h2>
-        <p className="text-muted-foreground">Internal Dashboard access uses NextAuth v5 session cookies. CLI and external script access use Bearer tokens placed in the Authorization header.</p>
-        <div className="glass bg-black p-4 rounded-lg border border-border mt-4 text-sm font-mono text-muted-foreground">
-          Authorization: Bearer oply_token_xxxxxxxxxxxx
-        </div>
-      </section>
+      {/* ─── The .oply Store ───────────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">The <code className="bg-transparent px-0 text-white font-mono">.oply/</code> Directory</h2>
+      <p className="text-gray-300 text-lg mb-8">
+        When you run <code className="text-[#00E5FF] text-sm">oply init</code>, the CLI creates a local directory inside your repository. This acts as the store for pipeline state, deployment histories, and sensitive configuration.
+      </p>
+      
+      <CodeBlock 
+        title="File System"
+        code={`.oply/
+├── oply.config.json      # Primary DAG and configuration
+├── .env.oply             # Local secrets (Added to .gitignore)
+├── state/
+│   ├── current.json      # Active environment state pointer
+│   └── history.json      # Append-only log of pipeline runs
+└── logs/
+    └── run-1234.log      # Output from local or remote tasks`} 
+      />
 
-      {/* Endpoints */}
-      <section className="space-y-8 mt-12">
-        <h2 className="text-2xl font-bold">Endpoints</h2>
+      <hr className="border-white/10 my-10" />
 
-        <div className="space-y-6">
+      {/* ─── Secrets Management ────────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">Security & Secrets</h2>
+      <p className="text-gray-300 text-lg mb-8">
+        Oply requires certain credentials to interact with LLMs (for AI debugging) and Cloud Providers (for deployments). These are inherently dangerous and therefore are securely managed via the local <code className="text-gray-400">.env.oply</code> file instead of global `.env` files.
+      </p>
 
-          {/* Webhooks */}
-          <div className="glass rounded-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-success text-white px-2 py-1 rounded text-xs">POST</span>
-                /api/v1/webhooks/github
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Receives GitHub Push/PR events. Verifies the SHA256 HMAC signature. Triggers pipeline executions based on branch matching.</p>
-              <h4 className="font-semibold text-sm">Payload</h4>
-              <pre className="text-xs font-mono text-muted-foreground bg-black p-3 rounded">{`{
-  "ref": "refs/heads/main",
-  "after": "abcd1234efgh5678",
-  "repository": { "html_url": "..." },
-  "pusher": { "email": "..." }
-}`}</pre>
-            </div>
-          </div>
+      <CodeBlock 
+        language="bash"
+        title=".env.oply"
+        code={`# ═══════════════════════════════════════════════════
+# Oply — Project Environment Variables
+# This file is gitignored. Do NOT commit it.
+# ═══════════════════════════════════════════════════
 
-          {/* Pipelines GET */}
-          <div className="glass rounded-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-accent text-white px-2 py-1 rounded text-xs">GET</span>
-                /api/v1/pipelines
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Retrieves the pipeline run history with nested DAG task statuses.</p>
-              <h4 className="font-semibold text-sm">Query Parameters</h4>
-              <ul className="text-sm text-muted-foreground list-disc pl-5">
-                <li><code>limit</code> (default 20)</li>
-                <li><code>workflowId</code> (optional)</li>
-                <li><code>status</code> (SUCCESS, FAILED, RUNNING)</li>
-              </ul>
-            </div>
-          </div>
+# OpenAI API Key (required for AI features)
+OPENAI_API_KEY=sk-xxxxxxx
 
-          {/* Pipelines POST */}
-          <div className="glass rounded-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-success text-white px-2 py-1 rounded text-xs">POST</span>
-                /api/v1/pipelines
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Trigger a pipeline run manually. This forces pipeline execution irrespective of webhooks.</p>
-              <h4 className="font-semibold text-sm">Payload</h4>
-              <pre className="text-xs font-mono text-muted-foreground bg-black p-3 rounded">{`{
-  "workflowId": "uuid",
-  "commitHash": "optional_override",
-  "commitMessage": "Manual trigger"
-}`}</pre>
-            </div>
-          </div>
+# Infrastructure & Version Control
+KUBE_CONFIG_PATH=~/.kube/config
+GITHUB_TOKEN=ghp_xxxxxxx
+DOCKER_REGISTRY_URL=registry.digitalocean.com/acme`} 
+      />
+      
+      <Callout type="warning" title="Gitignore Automation">
+        Oply automatically injects `.env.oply` and `.oply/logs/` to your repository's `.gitignore` during the `init` script to prevent catastrophic API key leaks. Never commit this file.
+      </Callout>
 
-          {/* Deployments POST */}
-          <div className="glass rounded-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-success text-white px-2 py-1 rounded text-xs">POST</span>
-                /api/v1/deployments
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Create a deployment event. Generates a risk score via the AI engine before executing the rollout strategy.</p>
-              <h4 className="font-semibold text-sm">Payload</h4>
-              <pre className="text-xs font-mono text-muted-foreground bg-black p-3 rounded">{`{
-  "projectId": "uuid",
-  "environmentId": "uuid",
-  "version": "v1.2.3",
-  "imageTag": "registry/app:commit",
-  "strategy": "BLUE_GREEN"
-}`}</pre>
-            </div>
-          </div>
+      <hr className="border-white/10 my-10" />
 
-          {/* Deployments PATCH */}
-          <div className="glass rounded-xl overflow-hidden border border-border">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-warning text-white px-2 py-1 rounded text-xs">PATCH</span>
-                /api/v1/deployments
-              </h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Approve a gated deployment, cancel it, or initiate a rollback to a healthy state.</p>
-              <h4 className="font-semibold text-sm">Payload</h4>
-              <pre className="text-xs font-mono text-muted-foreground bg-black p-3 rounded">{`{
-  "deploymentId": "uuid",
-  "action": "approve" | "rollback" | "cancel"
-}`}</pre>
-            </div>
-          </div>
-
-          {/* AI Chat Streaming */}
-          <div className="glass rounded-xl overflow-hidden border border-border border-l-4 border-l-accent">
-            <div className="px-6 py-4 border-b border-border bg-surface-hover flex justify-between items-center">
-              <h3 className="font-semibold text-lg flex items-center gap-3">
-                <span className="bg-success text-white px-2 py-1 rounded text-xs">POST</span>
-                /api/v1/ai/assistant/chat
-              </h3>
-              <span className="bg-accent/20 text-accent text-xs px-2 py-1 rounded">Server-Sent Events</span>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground">Initiate a conversation with the Copilot AI engine. Requires context objects. The response uses SSE (Server-Sent Events) to stream tokens dynamically in real time.</p>
-            </div>
-          </div>
-
-        </div>
-      </section>
+      {/* ─── State Synchronization ─────────────────────────────────── */}
+      <h2 className="text-2xl font-semibold text-white mb-6">Git Integration</h2>
+      <p className="text-gray-300 text-lg mb-4">
+        Oply&apos;s rollback mechanisms rely entirely on Git rather than external snapshotting. The CLI issues standard `git revert` commands locally before generating the patch diff and applying it to your Kubernetes cluster.
+      </p>
+      <p className="text-gray-300 text-lg">
+        Because the state is inherently tied to the commit hash, your `oply.config.json` travels with your code, allowing previous commits to securely maintain their historically accurate deployment DAGs.
+      </p>
 
     </div>
   );
