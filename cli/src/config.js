@@ -34,6 +34,10 @@ const config = new Conf({
       type: 'string',
       default: '',
     },
+    githubToken: {
+      type: 'string',
+      default: '',
+    },
   },
 });
 

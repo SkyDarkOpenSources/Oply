@@ -2,7 +2,8 @@
  * Oply CLI — Main Application
  * 
  * Production-grade CLI for the Oply Autonomous Software Delivery Platform.
- * Provides commands for pipeline management, deployment, Docker, K8s, and AI debugging.
+ * Provides commands for pipeline management, deployment, Docker, K8s, AI debugging,
+ * and real git integration that works against any local project.
  */
 
 import { Command } from 'commander';
@@ -15,12 +16,22 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 
-// Load .env from project root
+// Load .env from Oply repo root (for development)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const envPath = join(__dirname, '..', '..', '.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+const oplyEnvPath = join(__dirname, '..', '..', '.env');
+if (fs.existsSync(oplyEnvPath)) {
+  dotenv.config({ path: oplyEnvPath });
+}
+
+// Load .env and .env.oply from the user's current working directory
+const cwdEnvPath = join(process.cwd(), '.env');
+if (fs.existsSync(cwdEnvPath)) {
+  dotenv.config({ path: cwdEnvPath });
+}
+const cwdOplyEnvPath = join(process.cwd(), '.env.oply');
+if (fs.existsSync(cwdOplyEnvPath)) {
+  dotenv.config({ path: cwdOplyEnvPath });
 }
 
 import { initCommand } from './commands/init.js';
@@ -32,6 +43,7 @@ import { pipelineCommand } from './commands/pipeline.js';
 import { dockerCommand } from './commands/docker.js';
 import { k8sCommand } from './commands/k8s.js';
 import { rollbackCommand } from './commands/rollback.js';
+import { stageCommand } from './commands/stage.js';
 
 // ─── Banner ──────────────────────────────────────────
 const oplyGradient = gradient(['#6366f1', '#8b5cf6', '#a78bfa']);
@@ -73,6 +85,7 @@ program
 
 // Register all commands
 initCommand(program);
+stageCommand(program);
 statusCommand(program);
 deployCommand(program);
 logsCommand(program);

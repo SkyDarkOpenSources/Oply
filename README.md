@@ -128,17 +128,21 @@ Oply/
     └── src/
         ├── index.js          # Commander program setup
         ├── config.js         # Persistent config (conf)
-        ├── api.js            # API client (axios)
+        ├── api.js            # API + GitHub API client
+        ├── git.js            # Real git operations (stage, commits, diff)
+        ├── store.js          # Local state store (.oply/)
+        ├── project.js        # Project loader (oply.config.json)
         └── commands/
-            ├── init.js       # Project initialization
-            ├── status.js     # Pipeline & deployment status
-            ├── deploy.js     # Build, push, deploy workflow
-            ├── logs.js       # K8s/Docker/pipeline log viewer
-            ├── ai-debug.js   # AI failure analysis
-            ├── pipeline.js   # Pipeline trigger & generate
+            ├── init.js       # Project initialization + .oply/ setup
+            ├── stage.js      # Git staging info & environment status
+            ├── status.js     # Pipeline & deployment status (real data)
+            ├── deploy.js     # Build, test, deploy workflow (real execution)
+            ├── logs.js       # K8s/Docker/pipeline log viewer (real logs)
+            ├── ai-debug.js   # AI failure analysis (full project context)
+            ├── pipeline.js   # Pipeline DAG execution (real commands)
             ├── docker.js     # Docker build/push/scan/prune
             ├── k8s.js        # kubectl operations
-            └── rollback.js   # Deployment rollback
+            └── rollback.js   # Git revert + K8s rollback
 ```
 
 ---
@@ -209,16 +213,28 @@ npm install
 # Link the CLI globally so you can use the 'oply' command anywhere
 npm link
 
-# Now you can use the Oply CLI from any project directory!
+# Now go to ANY project directory and initialize Oply!
+cd ~/my-project
 oply init
 
-# Check pipeline status
+# This creates:
+# • oply.config.json — project configuration (commit this)
+# • .oply/ — local state store (gitignored)
+# • .env.oply — your API keys (gitignored)
+
+# View git staging info, commits, environment status
+oply stage
+
+# Check pipeline & deployment status
 oply status
+
+# Run your CI/CD pipeline (actually executes build/test/lint)
+oply pipeline trigger
 
 # Deploy to staging
 oply deploy --env staging
 
-# AI debugging
+# AI debugging (uses your OPENAI_API_KEY from .env.oply)
 oply ai-debug
 
 # View Kubernetes pods
@@ -247,12 +263,21 @@ oply k8s status
 ```
 COMMANDS:
   oply init                    Initialize Oply in current project
+  oply stage                   View git staging info & environment status
+  oply stage diff              Show staged diff (git diff --cached)
+  oply stage log               Show formatted git commit log
+  oply stage envs              Show deployment status per environment
   oply status                  View pipeline & deployment status
+  oply status --github         Show GitHub Actions & deployment status
+  oply status --git            Show detailed git history
   oply deploy [options]        Deploy to an environment
   oply logs [options]          View K8s/Docker/pipeline logs
+  oply logs --pipeline <id>    View logs for a specific pipeline run
   oply ai-debug                Interactive AI failure analysis
-  oply pipeline trigger        Trigger a pipeline run
-  oply pipeline generate       AI-generate a pipeline DAG
+  oply pipeline trigger        Execute the pipeline DAG
+  oply pipeline list           List recent pipeline runs
+  oply pipeline stages         Show configured pipeline stages
+  oply pipeline generate       Re-generate a pipeline DAG
   oply docker build            Build Docker image
   oply docker push             Push image to registry
   oply docker scan             Security scan with Trivy
@@ -264,8 +289,10 @@ COMMANDS:
   oply k8s rollout             Check rollout status
   oply k8s scale               Scale deployment replicas
   oply k8s events              Recent cluster events
-  oply rollback                Rollback a deployment
+  oply rollback                Rollback a deployment (git revert or K8s)
+```
 
+```
 DEPLOY OPTIONS:
   -e, --env <env>              Target: dev, staging, production
   -i, --image <tag>            Docker image tag

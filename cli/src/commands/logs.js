@@ -1,11 +1,22 @@
 /**
- * oply logs — Stream and view pipeline & service logs
+ * oply logs — Stream and view logs from pipelines, K8s, and Docker
+ * 
+ * Shows REAL logs from:
+ * 1. Pipeline runs — from .oply/logs/ (actual command output)
+ * 2. Kubernetes pods — via kubectl
+ * 3. Docker containers — via docker logs
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import { execSync } from 'child_process';
+import { loadProject, tryLoadProject } from '../project.js';
+import {
+  getPipelineRuns,
+  getRunLogs,
+  listRunLogs,
+} from '../store.js';
 
 export function logsCommand(program) {
   program
@@ -19,32 +30,33 @@ export function logsCommand(program) {
     .option('--pipeline <id>', 'Show logs for a specific pipeline run')
     .action(async (options) => {
       try {
-        if (options.pod) {
+        if (options.pipeline) {
+          showPipelineRunLogs(options.pipeline);
+        } else if (options.pod) {
           await showKubeLogs(options);
         } else if (options.service) {
           await showServiceLogs(options);
         } else {
           // Interactive mode
+          const choices = [
+            { name: '🔗 Pipeline Run Logs', value: 'pipeline' },
+            { name: '📦 Kubernetes Pod Logs', value: 'k8s' },
+            { name: '🐳 Docker Container Logs', value: 'docker' },
+          ];
+
           const answers = await inquirer.prompt([{
             type: 'list',
             name: 'source',
             message: 'Select log source:',
-            choices: [
-              { name: '📦 Kubernetes Pod Logs', value: 'k8s' },
-              { name: '🐳 Docker Container Logs', value: 'docker' },
-              { name: '🔗 Pipeline Run Logs', value: 'pipeline' },
-              { name: '📄 Local Application Logs', value: 'local' },
-            ],
+            choices,
           }]);
 
           if (answers.source === 'k8s') {
             await showKubeLogs(options);
           } else if (answers.source === 'docker') {
             await showDockerLogs(options);
-          } else if (answers.source === 'pipeline') {
-            showPipelineLogs();
           } else {
-            showLocalLogs();
+            await selectAndShowPipelineLogs();
           }
         }
       } catch (error) {
@@ -53,6 +65,124 @@ export function logsCommand(program) {
     });
 }
 
+/**
+ * Show logs for a specific pipeline run from the local store
+ */
+function showPipelineRunLogs(runId) {
+  const project = tryLoadProject();
+  const cwd = project?.projectDir || process.cwd();
+
+  const runs = getPipelineRuns(cwd);
+  const run = runs.find(r => r.id === runId);
+
+  if (!run) {
+    console.log(chalk.yellow(`\n  Pipeline run "${runId}" not found.`));
+    console.log(chalk.gray('  List runs with: ') + chalk.cyan('oply pipeline list\n'));
+    return;
+  }
+
+  const logs = getRunLogs(runId, cwd);
+
+  // Header
+  console.log('');
+  console.log(chalk.bold(`  Pipeline Run — ${chalk.gray(run.id)}`));
+  
+  const statusIcon = run.status === 'SUCCESS' ? chalk.green('✓') :
+                     run.status === 'FAILED' ? chalk.red('✗') :
+                     run.status === 'RUNNING' ? chalk.cyan('●') :
+                     chalk.yellow('○');
+  const statusColor = run.status === 'SUCCESS' ? chalk.green :
+                      run.status === 'FAILED' ? chalk.red :
+                      run.status === 'RUNNING' ? chalk.cyan :
+                      chalk.yellow;
+  
+  console.log(`  ${statusIcon} ${statusColor(run.status)}  Commit: ${chalk.yellow(run.commitHash?.slice(0, 7) || '—')}  Branch: ${chalk.gray(run.branch || '—')}  Triggered: ${chalk.gray(run.triggeredBy || '—')}`);
+  if (run.durationMs) console.log(chalk.gray(`  Duration: ${formatDuration(run.durationMs)}`));
+  console.log(chalk.gray('  ─────────────────────────────────\n'));
+
+  if (logs.length === 0) {
+    console.log(chalk.gray('  No logs recorded for this run.\n'));
+    return;
+  }
+
+  // Display logs with syntax highlighting
+  logs.forEach(line => {
+    if (line.includes('FAIL') || line.includes('ERR')) {
+      console.log(chalk.red(`  ${line}`));
+    } else if (line.includes('OK') || line.includes('SUCCESS')) {
+      console.log(chalk.green(`  ${line}`));
+    } else if (line.includes('START')) {
+      console.log(chalk.cyan(`  ${line}`));
+    } else if (line.includes('SKIP')) {
+      console.log(chalk.yellow(`  ${line}`));
+    } else if (line.includes('WARN')) {
+      console.log(chalk.yellow(`  ${line}`));
+    } else {
+      console.log(chalk.gray(`  ${line}`));
+    }
+  });
+  console.log('');
+
+  // Show stage results if available
+  if (run.stages && run.stages.length > 0) {
+    console.log(chalk.bold('  Stage Results:'));
+    run.stages.forEach(s => {
+      const icon = s.status === 'SUCCESS' ? chalk.green('✓') :
+                   s.status === 'FAILED' ? chalk.red('✗') :
+                   s.status === 'SKIPPED' ? chalk.gray('⊘') :
+                   chalk.yellow('○');
+      const color = s.status === 'SUCCESS' ? chalk.green :
+                    s.status === 'FAILED' ? chalk.red :
+                    chalk.gray;
+      const dur = s.duration ? chalk.gray(` (${formatDuration(s.duration)})`) : '';
+      console.log(`  ${icon} ${color(s.name)}${dur}`);
+    });
+    console.log('');
+  }
+}
+
+/**
+ * Interactive: select a pipeline run and show its logs
+ */
+async function selectAndShowPipelineLogs() {
+  const project = tryLoadProject();
+  const cwd = project?.projectDir || process.cwd();
+  const runs = getPipelineRuns(cwd);
+
+  if (runs.length === 0) {
+    console.log(chalk.gray('\n  No pipeline runs found.'));
+    console.log(chalk.gray('  Trigger one with: ') + chalk.cyan('oply pipeline trigger\n'));
+    return;
+  }
+
+  const choices = runs.slice(0, 15).map(run => {
+    const icon = run.status === 'SUCCESS' ? '✓' :
+                 run.status === 'FAILED' ? '✗' :
+                 run.status === 'RUNNING' ? '●' : '○';
+    const statusLabel = run.status === 'SUCCESS' ? chalk.green(icon) :
+                        run.status === 'FAILED' ? chalk.red(icon) :
+                        run.status === 'RUNNING' ? chalk.cyan(icon) :
+                        chalk.yellow(icon);
+    
+    return {
+      name: `${statusLabel} ${run.id}  ${chalk.yellow(run.commitHash?.slice(0, 7) || '—')}  ${chalk.gray(run.triggeredBy || '—')}  ${chalk.gray(timeAgo(run.startedAt))}`,
+      value: run.id,
+    };
+  });
+
+  const { selectedRun } = await inquirer.prompt([{
+    type: 'list',
+    name: 'selectedRun',
+    message: 'Select a pipeline run:',
+    choices,
+  }]);
+
+  showPipelineRunLogs(selectedRun);
+}
+
+/**
+ * Show Kubernetes pod logs (real kubectl)
+ */
 async function showKubeLogs(options) {
   const spinner = ora('Fetching Kubernetes pods...').start();
   
@@ -96,6 +226,9 @@ async function showKubeLogs(options) {
   }
 }
 
+/**
+ * Show Docker container logs (real docker)
+ */
 async function showDockerLogs(options) {
   const spinner = ora('Fetching Docker containers...').start();
   
@@ -135,47 +268,9 @@ async function showDockerLogs(options) {
   }
 }
 
-function showPipelineLogs() {
-  console.log('');
-  console.log(chalk.bold('  Pipeline Run #run-003 — Build & Deploy API'));
-  console.log(chalk.gray('  Commit: i7j8k9l • Triggered: manual • Status: ') + chalk.cyan('RUNNING'));
-  console.log(chalk.gray('  ─────────────────────────────────\n'));
-
-  const logs = [
-    { ts: '10:32:01', level: 'INFO', msg: 'Pipeline started' },
-    { ts: '10:32:01', level: 'INFO', msg: 'Step [LINT] → npm run lint' },
-    { ts: '10:32:05', level: 'INFO', msg: '✓ Lint passed (4.2s)' },
-    { ts: '10:32:05', level: 'INFO', msg: 'Step [TEST] → npm test' },
-    { ts: '10:32:05', level: 'INFO', msg: 'Step [E2E] → npx playwright test' },
-    { ts: '10:32:18', level: 'INFO', msg: '✓ Unit tests passed — 48/48 (13.1s)' },
-    { ts: '10:32:25', level: 'WARN', msg: 'E2E: checkout test slow — timeout approaching' },
-    { ts: '10:32:32', level: 'INFO', msg: '✓ E2E tests passed — 12/12 (27.3s)' },
-    { ts: '10:32:32', level: 'INFO', msg: 'Step [BUILD] → docker build -t app:i7j8k9l .' },
-    { ts: '10:32:48', level: 'INFO', msg: '✓ Docker image built (16.4s)' },
-    { ts: '10:32:48', level: 'INFO', msg: 'Pushing to registry.oply.io/app:i7j8k9l...' },
-    { ts: '10:32:55', level: 'INFO', msg: '✓ Image pushed to registry' },
-    { ts: '10:32:55', level: 'INFO', msg: 'AI Risk Score: 12/100 — Auto-approved' },
-    { ts: '10:32:56', level: 'INFO', msg: 'Step [DEPLOY] → kubectl set image ...' },
-    { ts: '10:33:02', level: 'INFO', msg: '✓ Deployed to staging. Health checks passing.' },
-  ];
-
-  logs.forEach(log => {
-    const levelColor = log.level === 'WARN' ? chalk.yellow : log.level === 'ERROR' ? chalk.red : chalk.gray;
-    console.log(`  ${chalk.gray(log.ts)}  ${levelColor(log.level.padEnd(5))}  ${log.msg.includes('✓') ? chalk.green(log.msg) : log.msg}`);
-  });
-  console.log('');
-}
-
-function showLocalLogs() {
-  console.log(chalk.gray('\n  Tailing local application logs (stdout)...\n'));
-  console.log(chalk.gray('  Use Ctrl+C to stop.\n'));
-  try {
-    execSync('tail -f /var/log/syslog 2>/dev/null || echo "No local log file found"', { stdio: 'inherit', timeout: 30000 });
-  } catch {
-    // User interrupted
-  }
-}
-
+/**
+ * Show service logs via kubectl
+ */
 async function showServiceLogs(options) {
   const spinner = ora(`Fetching logs for service: ${options.service}...`).start();
   try {
@@ -186,6 +281,28 @@ async function showServiceLogs(options) {
     spinner.succeed('');
   } catch (err) {
     spinner.fail('Could not fetch service logs');
-    showPipelineLogs();
+    console.log(chalk.gray('  Make sure the service exists and kubectl is configured.\n'));
   }
+}
+
+function formatDuration(ms) {
+  if (!ms) return '—';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainSeconds = seconds % 60;
+  return `${minutes}m ${remainSeconds}s`;
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '—';
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }

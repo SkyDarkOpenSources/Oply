@@ -1,48 +1,328 @@
 /**
- * oply status — View pipeline and deployment status
+ * oply status — View real pipeline and deployment status
+ * 
+ * Shows data from:
+ * 1. Local git state (branch, commits, ahead/behind)
+ * 2. Local store (.oply/store.json — real pipeline runs & deployments)
+ * 3. GitHub API (if GITHUB_TOKEN is set — workflow runs & deployments)
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import Table from 'cli-table3';
-import { apiGet, healthCheck } from '../api.js';
+import { loadProject } from '../project.js';
+import { getPipelineRuns, getDeployments, storeExists } from '../store.js';
+import {
+  getCurrentBranch,
+  getCommitHash,
+  getRecentCommits,
+  getAheadBehind,
+  getRemoteUrl,
+  isGitRepo,
+  getCommitCount,
+} from '../git.js';
+import {
+  healthCheck,
+  apiGet,
+  hasGitHubToken,
+  parseGitHubRepo,
+  getGitHubWorkflowRuns,
+  getGitHubDeployments,
+} from '../api.js';
 
 export function statusCommand(program) {
   program
     .command('status')
-    .description('View pipeline runs and deployment status')
-    .option('-l, --limit <n>', 'Number of recent runs to show', '10')
-    .option('--deployments', 'Show deployment status instead of pipelines')
+    .description('View pipeline runs, deployment status, and project health')
+    .option('-l, --limit <n>', 'Number of recent items to show', '10')
+    .option('--deployments', 'Show deployment history')
+    .option('--github', 'Show GitHub Actions status (requires GITHUB_TOKEN)')
+    .option('--git', 'Show detailed git status')
     .action(async (options) => {
       try {
-        const spinner = ora('Fetching status from Oply...').start();
+        const project = loadProject();
+        const cwd = project.projectDir;
+        const projectName = project.config.project?.name || 'project';
+        const limit = parseInt(options.limit, 10) || 10;
 
-        const isOnline = await healthCheck();
+        // ─── Header ─────────────────────────────
+        const branch = isGitRepo(cwd) ? getCurrentBranch(cwd) : '—';
+        const hash = isGitRepo(cwd) ? getCommitHash(cwd) : '—';
+        const { ahead, behind } = isGitRepo(cwd) ? getAheadBehind(cwd) : { ahead: 0, behind: 0 };
 
-        if (!isOnline) {
-          spinner.warn('Oply API not reachable — showing local status');
-          showLocalStatus();
-          return;
-        }
+        console.log('');
+        console.log(chalk.bold(`  📊 Status — ${chalk.cyan(projectName)}`));
+        console.log(chalk.gray(`  Branch: ${chalk.yellow(branch)}  Commit: ${chalk.yellow(hash)}  Stack: ${chalk.cyan(project.config.stack?.framework || '—')}`));
+        
+        let syncLine = '';
+        if (ahead > 0) syncLine += chalk.green(` ↑${ahead} ahead`);
+        if (behind > 0) syncLine += chalk.red(` ↓${behind} behind`);
+        if (syncLine) console.log(chalk.gray('  Remote:') + syncLine);
+        console.log('');
 
+        // ─── Route to sub-views ─────────────────
         if (options.deployments) {
-          spinner.text = 'Fetching deployments...';
-          const data = await apiGet('/v1/deployments', { limit: options.limit });
-          spinner.succeed('Deployments fetched');
-          showDeploymentTable(data.deployments || []);
+          showDeployments(cwd, limit);
+        } else if (options.github) {
+          await showGitHubStatus(project, limit);
+        } else if (options.git) {
+          showGitStatus(cwd);
         } else {
-          spinner.text = 'Fetching pipeline runs...';
-          const data = await apiGet('/v1/pipelines', { limit: options.limit });
-          spinner.succeed('Pipeline runs fetched');
-          showPipelineTable(data.runs || []);
+          // Default: show everything
+          showPipelineRuns(cwd, limit);
+          showDeployments(cwd, limit);
+          
+          // If GitHub token is available, show GitHub status too
+          if (hasGitHubToken()) {
+            await showGitHubStatus(project, 5);
+          }
         }
+
       } catch (error) {
-        // Fallback to demo data when API not available
-        console.log(chalk.yellow('\n  ⚠ Could not reach Oply API — showing demo status\n'));
-        showLocalStatus();
+        console.error(chalk.red(`\n  Error: ${error.message}\n`));
       }
     });
 }
+
+function showPipelineRuns(cwd, limit) {
+  const runs = getPipelineRuns(cwd);
+
+  if (runs.length === 0) {
+    console.log(chalk.gray('  No pipeline runs yet. Trigger one with: ') + chalk.cyan('oply pipeline trigger'));
+    console.log('');
+    return;
+  }
+
+  const table = new Table({
+    head: [
+      chalk.gray('Status'),
+      chalk.gray('Run ID'),
+      chalk.gray('Commit'),
+      chalk.gray('Branch'),
+      chalk.gray('Duration'),
+      chalk.gray('Triggered'),
+      chalk.gray('Time'),
+    ],
+    style: { head: [], border: ['gray'] },
+    chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
+  });
+
+  runs.slice(0, limit).forEach(run => {
+    const icon = statusIcon(run.status);
+    const color = statusColor(run.status);
+
+    table.push([
+      icon + ' ' + color,
+      chalk.gray(run.id),
+      chalk.yellow(run.commitHash?.slice(0, 7) || '—'),
+      chalk.gray(run.branch || '—'),
+      chalk.gray(run.durationMs ? formatDuration(run.durationMs) : run.status === 'RUNNING' ? chalk.cyan('running...') : '—'),
+      chalk.gray(run.triggeredBy || '—'),
+      chalk.gray(timeAgo(run.startedAt)),
+    ]);
+  });
+
+  console.log(chalk.bold('  Pipeline Runs:'));
+  console.log(table.toString());
+  console.log('');
+}
+
+function showDeployments(cwd, limit) {
+  const deployments = getDeployments(cwd);
+
+  if (deployments.length === 0) {
+    console.log(chalk.gray('  No deployments yet. Deploy with: ') + chalk.cyan('oply deploy --env dev'));
+    console.log('');
+    return;
+  }
+
+  // Current status per environment
+  const envMap = {};
+  deployments.forEach(d => {
+    if (!envMap[d.environment]) envMap[d.environment] = d;
+  });
+
+  console.log(chalk.bold('  Current Deployments:'));
+  Object.values(envMap).forEach(d => {
+    const icon = d.status === 'SUCCESS' ? chalk.green('✓') :
+                 d.status === 'FAILED' ? chalk.red('✗') :
+                 d.status === 'ROLLED_BACK' ? chalk.red('↩') :
+                 chalk.yellow('●');
+    const statusLabel = d.status === 'SUCCESS' ? chalk.green('LIVE') :
+                        d.status === 'FAILED' ? chalk.red('FAILED') :
+                        d.status === 'ROLLED_BACK' ? chalk.red('ROLLED BACK') :
+                        chalk.yellow(d.status);
+    console.log(`  ${icon} ${chalk.cyan(d.environment.padEnd(14))} ${statusLabel}  commit ${chalk.yellow(d.commitHash?.slice(0, 7) || '—')}  ${chalk.gray(timeAgo(d.timestamp))}`);
+  });
+  console.log('');
+
+  // Recent deployment history
+  if (deployments.length > Object.keys(envMap).length) {
+    const table = new Table({
+      head: [
+        chalk.gray('Status'),
+        chalk.gray('Environment'),
+        chalk.gray('Commit'),
+        chalk.gray('Strategy'),
+        chalk.gray('Duration'),
+        chalk.gray('Time'),
+      ],
+      style: { head: [], border: ['gray'] },
+      chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
+    });
+
+    deployments.slice(0, limit).forEach(d => {
+      table.push([
+        statusIcon(d.status) + ' ' + statusColor(d.status),
+        chalk.cyan(d.environment),
+        chalk.yellow(d.commitHash?.slice(0, 7) || '—'),
+        chalk.gray(d.strategy || 'ROLLING'),
+        chalk.gray(d.duration ? formatDuration(d.duration) : '—'),
+        chalk.gray(timeAgo(d.timestamp)),
+      ]);
+    });
+
+    console.log(chalk.bold('  Deployment History:'));
+    console.log(table.toString());
+    console.log('');
+  }
+}
+
+async function showGitHubStatus(project, limit) {
+  if (!hasGitHubToken()) {
+    console.log(chalk.yellow('  ⚠ GITHUB_TOKEN not set — cannot fetch GitHub status'));
+    console.log(chalk.gray('  Set it in .env.oply or run: oply init\n'));
+    return;
+  }
+
+  const repoUrl = project.config.project?.repository || '';
+  const repo = parseGitHubRepo(repoUrl);
+  if (!repo) {
+    console.log(chalk.yellow('  ⚠ Could not parse GitHub repo from: ' + (repoUrl || '(no URL)')));
+    console.log(chalk.gray('  Set a valid GitHub repo URL in oply.config.json\n'));
+    return;
+  }
+
+  const spinner = ora('Fetching GitHub status...').start();
+
+  try {
+    const [workflowRuns, ghDeployments] = await Promise.all([
+      getGitHubWorkflowRuns(repo.owner, repo.repo, limit),
+      getGitHubDeployments(repo.owner, repo.repo, limit),
+    ]);
+
+    spinner.succeed(`GitHub status for ${chalk.cyan(`${repo.owner}/${repo.repo}`)}`);
+
+    // Workflow runs
+    if (workflowRuns.length > 0) {
+      const table = new Table({
+        head: [
+          chalk.gray('Status'),
+          chalk.gray('Workflow'),
+          chalk.gray('Branch'),
+          chalk.gray('Commit'),
+          chalk.gray('Time'),
+        ],
+        style: { head: [], border: ['gray'] },
+        chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
+      });
+
+      workflowRuns.forEach(run => {
+        const ghStatus = run.conclusion || run.status;
+        const icon = ghStatus === 'success' ? chalk.green('✓') :
+                     ghStatus === 'failure' ? chalk.red('✗') :
+                     ghStatus === 'in_progress' ? chalk.cyan('●') :
+                     chalk.yellow('○');
+        const color = ghStatus === 'success' ? chalk.green(ghStatus) :
+                      ghStatus === 'failure' ? chalk.red(ghStatus) :
+                      ghStatus === 'in_progress' ? chalk.cyan(ghStatus) :
+                      chalk.yellow(ghStatus);
+
+        table.push([
+          icon + ' ' + color,
+          chalk.white(run.name || '—'),
+          chalk.gray(run.branch || '—'),
+          chalk.yellow(run.commit || '—'),
+          chalk.gray(timeAgo(run.createdAt)),
+        ]);
+      });
+
+      console.log(chalk.bold('\n  GitHub Actions:'));
+      console.log(table.toString());
+    }
+
+    // GitHub Deployments
+    if (ghDeployments.length > 0) {
+      const depTable = new Table({
+        head: [
+          chalk.gray('Status'),
+          chalk.gray('Environment'),
+          chalk.gray('Ref'),
+          chalk.gray('Commit'),
+          chalk.gray('Creator'),
+          chalk.gray('Time'),
+        ],
+        style: { head: [], border: ['gray'] },
+        chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
+      });
+
+      ghDeployments.forEach(dep => {
+        const icon = dep.status === 'success' ? chalk.green('✓') :
+                     dep.status === 'failure' ? chalk.red('✗') :
+                     dep.status === 'in_progress' ? chalk.cyan('●') :
+                     chalk.yellow('○');
+
+        depTable.push([
+          icon + ' ' + chalk.gray(dep.status),
+          chalk.cyan(dep.environment),
+          chalk.gray(dep.ref),
+          chalk.yellow(dep.sha || '—'),
+          chalk.gray(dep.creator),
+          chalk.gray(timeAgo(dep.createdAt)),
+        ]);
+      });
+
+      console.log(chalk.bold('\n  GitHub Deployments:'));
+      console.log(depTable.toString());
+    }
+    
+    console.log('');
+  } catch (err) {
+    spinner.fail('Could not fetch GitHub status: ' + err.message);
+  }
+}
+
+function showGitStatus(cwd) {
+  const commits = getRecentCommits(10, cwd);
+  const totalCommits = getCommitCount(cwd);
+
+  console.log(chalk.bold(`  Git History (${totalCommits} total commits):\n`));
+
+  if (commits.length === 0) {
+    console.log(chalk.gray('  No commits yet.\n'));
+    return;
+  }
+
+  const table = new Table({
+    head: [chalk.gray('Hash'), chalk.gray('Message'), chalk.gray('Author'), chalk.gray('When')],
+    style: { head: [], border: ['gray'] },
+    chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
+  });
+
+  commits.forEach(c => {
+    table.push([
+      chalk.yellow(c.shortHash),
+      chalk.white(c.message.length > 50 ? c.message.slice(0, 50) + '...' : c.message),
+      chalk.gray(c.author),
+      chalk.gray(c.relativeDate),
+    ]);
+  });
+
+  console.log(table.toString());
+  console.log('');
+}
+
+// ─── Helpers ─────────────────────────────────────
 
 function statusIcon(status) {
   const map = {
@@ -73,113 +353,13 @@ function statusColor(status) {
   return (map[status] || chalk.gray)(status);
 }
 
-function riskColor(score) {
-  if (score <= 30) return chalk.green(score + '/100');
-  if (score <= 60) return chalk.yellow(score + '/100');
-  return chalk.red(score + '/100');
-}
-
-function showPipelineTable(runs) {
-  const table = new Table({
-    head: [
-      chalk.gray('Status'),
-      chalk.gray('Pipeline'),
-      chalk.gray('Commit'),
-      chalk.gray('Duration'),
-      chalk.gray('Triggered By'),
-      chalk.gray('Time'),
-    ],
-    style: { head: [], border: ['gray'] },
-    chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
-  });
-
-  if (runs.length === 0) {
-    console.log(chalk.gray('\n  No pipeline runs found. Trigger one with: oply pipeline trigger\n'));
-    return;
-  }
-
-  runs.forEach((run) => {
-    table.push([
-      statusIcon(run.status) + ' ' + statusColor(run.status),
-      chalk.white(run.workflow?.name || 'Unknown'),
-      chalk.gray(run.commitHash?.slice(0, 7) || '—'),
-      chalk.gray(run.durationMs ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'),
-      chalk.gray(run.triggeredBy || '—'),
-      chalk.gray(timeAgo(run.createdAt)),
-    ]);
-  });
-
-  console.log('');
-  console.log(table.toString());
-  console.log('');
-}
-
-function showDeploymentTable(deps) {
-  const table = new Table({
-    head: [
-      chalk.gray('Status'),
-      chalk.gray('Service'),
-      chalk.gray('Environment'),
-      chalk.gray('Version'),
-      chalk.gray('Strategy'),
-      chalk.gray('Risk'),
-    ],
-    style: { head: [], border: ['gray'] },
-    chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
-  });
-
-  deps.forEach((dep) => {
-    table.push([
-      statusIcon(dep.status) + ' ' + statusColor(dep.status),
-      chalk.white(dep.project?.name || 'unknown'),
-      chalk.cyan(dep.environment?.name || '—'),
-      chalk.gray(dep.version || '—'),
-      chalk.gray(dep.strategy || 'ROLLING'),
-      dep.aiRiskScore != null ? riskColor(dep.aiRiskScore) : chalk.gray('—'),
-    ]);
-  });
-
-  console.log('');
-  console.log(table.toString());
-  console.log('');
-}
-
-function showLocalStatus() {
-  const table = new Table({
-    head: [
-      chalk.gray('Status'),
-      chalk.gray('Pipeline'),
-      chalk.gray('Commit'),
-      chalk.gray('Duration'),
-      chalk.gray('Triggered'),
-      chalk.gray('Time'),
-    ],
-    style: { head: [], border: ['gray'] },
-    chars: { mid: '', 'left-mid': '', 'mid-mid': '', 'right-mid': '' },
-  });
-
-  const demoRuns = [
-    { status: 'SUCCESS', name: 'Build & Deploy API', commit: 'a1b2c3d', duration: '42s', by: 'webhook', time: '2 min ago' },
-    { status: 'SUCCESS', name: 'Frontend CI', commit: 'e4f5g6h', duration: '38s', by: 'webhook', time: '15 min ago' },
-    { status: 'RUNNING', name: 'Build & Deploy API', commit: 'i7j8k9l', duration: '—', by: 'manual', time: 'just now' },
-    { status: 'FAILED', name: 'E2E Test Suite', commit: 'm0n1o2p', duration: '1m 23s', by: 'webhook', time: '1 hour ago' },
-    { status: 'SUCCESS', name: 'Security Scan', commit: 'q3r4s5t', duration: '55s', by: 'schedule', time: '3 hours ago' },
-  ];
-
-  demoRuns.forEach((run) => {
-    table.push([
-      statusIcon(run.status) + ' ' + statusColor(run.status),
-      chalk.white(run.name),
-      chalk.gray(run.commit),
-      chalk.gray(run.duration),
-      chalk.gray(run.by),
-      chalk.gray(run.time),
-    ]);
-  });
-
-  console.log('');
-  console.log(table.toString());
-  console.log('');
+function formatDuration(ms) {
+  if (!ms) return '—';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainSeconds = seconds % 60;
+  return `${minutes}m ${remainSeconds}s`;
 }
 
 function timeAgo(dateStr) {
