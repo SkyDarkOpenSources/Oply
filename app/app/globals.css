@@ -1,6 +1,10 @@
 @import "tailwindcss";
+@source "../**/*.{ts,tsx}";
+@source "../../components/**/*.{ts,tsx}";
+@source "../../lib/**/*.{ts,tsx}";
 
-@theme inline {
+
+@theme {
   --color-background: #0A0A0A;
   --color-foreground: #EDEDED;
   --color-surface: #111111;

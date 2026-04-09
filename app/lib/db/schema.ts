@@ -76,6 +76,11 @@ export const users = pgTable("user", {
   image: text("image"),
   role: varchar("role", { length: 50 }).default("MEMBER").notNull(), // ADMIN, MEMBER, VIEWER
   organizationId: uuid("organizationId").references(() => organizations.id),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  stripeCurrentPeriodEnd: timestamp("stripe_current_period_end", { mode: "date" }),
+  creditsCount: integer("credits_count").default(100).notNull(), // AI Usage credits
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -85,7 +90,7 @@ export const users = pgTable("user", {
 
 export const projects = pgTable("project", {
   id: uuid("id").defaultRandom().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull().unique(), // Added unique constraint
   description: text("description"),
   organizationId: uuid("organizationId").references(() => organizations.id),
   createdById: uuid("createdById").references(() => users.id),
@@ -206,8 +211,46 @@ export const aiMessages = pgTable("ai_message", {
 });
 
 // ═══════════════════════════════════════════════════════════
+// AI Automation Nodes (Visual Drag and Drop Workflow)
+// ═══════════════════════════════════════════════════════════
+
+export const aiAutomations = pgTable("ai_automation", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("projectId").references(() => projects.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const aiNodes = pgTable("ai_node", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  automationId: uuid("automationId").references(() => aiAutomations.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(), // TRIGGER, ACTION, condition
+  config: jsonb("config"), // specific node configuration (e.g. repo push, send slack)
+  positionX: integer("positionX").default(0),
+  positionY: integer("positionY").default(0),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════════
 // Relations
 // ═══════════════════════════════════════════════════════════
+
+export const aiAutomationRelations = relations(aiAutomations, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [aiAutomations.projectId],
+    references: [projects.id],
+  }),
+  nodes: many(aiNodes),
+}));
+
+export const aiNodeRelations = relations(aiNodes, ({ one }) => ({
+  automation: one(aiAutomations, {
+    fields: [aiNodes.automationId],
+    references: [aiAutomations.id],
+  }),
+}));
 
 export const organizationRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -236,6 +279,7 @@ export const projectRelations = relations(projects, ({ one, many }) => ({
   repositories: many(repositories),
   environments: many(environments),
   deployments: many(deployments),
+  aiAutomations: many(aiAutomations),
 }));
 
 export const repositoryRelations = relations(repositories, ({ one, many }) => ({
