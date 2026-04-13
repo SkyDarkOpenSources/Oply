@@ -9,12 +9,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { pipelineRuns, workflows, taskRuns } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { getApiAuth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getApiAuth();
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getApiAuth();
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       workflowId,
       commitHash: commitHash || "manual",
       commitMessage: commitMessage || "Manual trigger",
-      triggeredBy: session.user.email || "manual",
+      triggeredBy: user.email || "manual",
       status: "QUEUED",
     }).returning();
 

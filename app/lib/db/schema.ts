@@ -1,8 +1,18 @@
 /**
  * Oply Database Schema — Drizzle ORM + PostgreSQL
  * 
- * This schema matches the design in docs/DATABASE.md exactly,
- * plus the NextAuth tables required for authentication.
+ * Tables:
+ * - NextAuth (account, session, verificationToken)
+ * - Core identity (organization, user)
+ * - Projects & repos
+ * - Environments
+ * - Workflows, pipeline runs, task runs
+ * - Deployments
+ * - AI conversations & messages
+ * - AI automation nodes
+ * - CLI sessions (device-code login)
+ * - Subscriptions (Stripe)
+ * - Usage tracking
  */
 
 import {
@@ -19,7 +29,7 @@ import {
 import { relations } from "drizzle-orm";
 
 // ═══════════════════════════════════════════════════════════
-// NextAuth.js Tables (required for Drizzle adapter)
+// NextAuth.js Tables
 // ═══════════════════════════════════════════════════════════
 
 export const accounts = pgTable("account", {
@@ -74,13 +84,13 @@ export const users = pgTable("user", {
   email: varchar("email", { length: 255 }).unique().notNull(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
-  role: varchar("role", { length: 50 }).default("MEMBER").notNull(), // ADMIN, MEMBER, VIEWER
+  role: varchar("role", { length: 50 }).default("MEMBER").notNull(),
   organizationId: uuid("organizationId").references(() => organizations.id),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   stripeCurrentPeriodEnd: timestamp("stripe_current_period_end", { mode: "date" }),
-  creditsCount: integer("credits_count").default(100).notNull(), // AI Usage credits
+  creditsCount: integer("credits_count").default(100).notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -90,7 +100,7 @@ export const users = pgTable("user", {
 
 export const projects = pgTable("project", {
   id: uuid("id").defaultRandom().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull().unique(), // Added unique constraint
+  name: varchar("name", { length: 255 }).notNull().unique(),
   description: text("description"),
   organizationId: uuid("organizationId").references(() => organizations.id),
   createdById: uuid("createdById").references(() => users.id),
@@ -101,7 +111,7 @@ export const projects = pgTable("project", {
 export const repositories = pgTable("repository", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("projectId").references(() => projects.id, { onDelete: "cascade" }),
-  provider: varchar("provider", { length: 50 }).notNull(), // GITHUB, GITLAB, BITBUCKET
+  provider: varchar("provider", { length: 50 }).notNull(),
   url: varchar("url", { length: 500 }).notNull(),
   branch: varchar("branch", { length: 255 }).default("main").notNull(),
   webhookId: varchar("webhookId", { length: 255 }),
@@ -110,14 +120,14 @@ export const repositories = pgTable("repository", {
 });
 
 // ═══════════════════════════════════════════════════════════
-// Environments (Dev, Staging, Production)
+// Environments
 // ═══════════════════════════════════════════════════════════
 
 export const environments = pgTable("environment", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("projectId").references(() => projects.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 50 }).notNull(), // DEV, STAGING, PRODUCTION
-  clusterConfig: jsonb("clusterConfig"), // K8s connection details, agent IDs
+  name: varchar("name", { length: 50 }).notNull(),
+  clusterConfig: jsonb("clusterConfig"),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
@@ -130,7 +140,6 @@ export const workflows = pgTable("workflow", {
   id: uuid("id").defaultRandom().primaryKey(),
   repositoryId: uuid("repositoryId").references(() => repositories.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
-  // AI-generated DAG definition, triggers (push, schedule, manual)
   metadata: jsonb("metadata"),
   triggerType: varchar("triggerType", { length: 50 }).default("push").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
@@ -143,12 +152,11 @@ export const pipelineRuns = pgTable("pipeline_run", {
   workflowId: uuid("workflowId").references(() => workflows.id, { onDelete: "cascade" }),
   commitHash: varchar("commitHash", { length: 255 }),
   commitMessage: text("commitMessage"),
-  triggeredBy: varchar("triggeredBy", { length: 255 }), // user email or 'webhook'
-  status: varchar("status", { length: 50 }).default("QUEUED").notNull(), // QUEUED, RUNNING, SUCCESS, FAILED, CANCELLED
+  triggeredBy: varchar("triggeredBy", { length: 255 }),
+  status: varchar("status", { length: 50 }).default("QUEUED").notNull(),
   startedAt: timestamp("startedAt", { mode: "date" }),
   completedAt: timestamp("completedAt", { mode: "date" }),
   durationMs: integer("durationMs"),
-  // Cached AI failure analysis to avoid re-querying
   aiAnalysis: jsonb("aiAnalysis"),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
@@ -157,12 +165,12 @@ export const taskRuns = pgTable("task_run", {
   id: uuid("id").defaultRandom().primaryKey(),
   pipelineRunId: uuid("pipelineRunId").references(() => pipelineRuns.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // BUILD, TEST, LINT, DEPLOY, SECURITY_SCAN, NOTIFY
+  type: varchar("type", { length: 50 }).notNull(),
   status: varchar("status", { length: 50 }).default("PENDING").notNull(),
-  command: text("command"), // e.g. "npm run build"
-  dependsOn: jsonb("dependsOn").$type<string[]>(), // IDs of task_runs this depends on
+  command: text("command"),
+  dependsOn: jsonb("dependsOn").$type<string[]>(),
   logsUrl: varchar("logsUrl", { length: 500 }),
-  logs: text("logs"), // inline logs for fast access
+  logs: text("logs"),
   durationMs: integer("durationMs"),
   errorMessage: text("errorMessage"),
   startedAt: timestamp("startedAt", { mode: "date" }),
@@ -177,9 +185,9 @@ export const deployments = pgTable("deployment", {
   projectId: uuid("projectId").references(() => projects.id),
   version: varchar("version", { length: 100 }),
   imageTag: varchar("imageTag", { length: 500 }),
-  strategy: varchar("strategy", { length: 50 }).default("ROLLING").notNull(), // ROLLING, CANARY, BLUE_GREEN
-  status: varchar("status", { length: 50 }).default("PENDING").notNull(), // PENDING, PROGRESSING, HEALTHY, DEGRADED, ROLLED_BACK
-  aiRiskScore: integer("aiRiskScore"), // 0–100
+  strategy: varchar("strategy", { length: 50 }).default("ROLLING").notNull(),
+  status: varchar("status", { length: 50 }).default("PENDING").notNull(),
+  aiRiskScore: integer("aiRiskScore"),
   aiRiskReasoning: text("aiRiskReasoning"),
   approvedBy: uuid("approvedBy").references(() => users.id),
   approvedAt: timestamp("approvedAt", { mode: "date" }),
@@ -189,7 +197,7 @@ export const deployments = pgTable("deployment", {
 });
 
 // ═══════════════════════════════════════════════════════════
-// AI Conversation Logs (Copilot history)
+// AI Conversations & Automation
 // ═══════════════════════════════════════════════════════════
 
 export const aiConversations = pgTable("ai_conversation", {
@@ -204,15 +212,11 @@ export const aiConversations = pgTable("ai_conversation", {
 export const aiMessages = pgTable("ai_message", {
   id: uuid("id").defaultRandom().primaryKey(),
   conversationId: uuid("conversationId").references(() => aiConversations.id, { onDelete: "cascade" }),
-  role: varchar("role", { length: 20 }).notNull(), // 'user' | 'assistant' | 'system'
+  role: varchar("role", { length: 20 }).notNull(),
   content: text("content").notNull(),
-  metadata: jsonb("metadata"), // tokens used, model, etc.
+  metadata: jsonb("metadata"),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
-
-// ═══════════════════════════════════════════════════════════
-// AI Automation Nodes (Visual Drag and Drop Workflow)
-// ═══════════════════════════════════════════════════════════
 
 export const aiAutomations = pgTable("ai_automation", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -226,31 +230,64 @@ export const aiAutomations = pgTable("ai_automation", {
 export const aiNodes = pgTable("ai_node", {
   id: uuid("id").defaultRandom().primaryKey(),
   automationId: uuid("automationId").references(() => aiAutomations.id, { onDelete: "cascade" }),
-  type: varchar("type", { length: 50 }).notNull(), // TRIGGER, ACTION, condition
-  config: jsonb("config"), // specific node configuration (e.g. repo push, send slack)
+  type: varchar("type", { length: 50 }).notNull(),
+  config: jsonb("config"),
   positionX: integer("positionX").default(0),
   positionY: integer("positionY").default(0),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
 
 // ═══════════════════════════════════════════════════════════
-// Relations
+// CLI Sessions (Device-Code Login)
 // ═══════════════════════════════════════════════════════════
 
-export const aiAutomationRelations = relations(aiAutomations, ({ one, many }) => ({
-  project: one(projects, {
-    fields: [aiAutomations.projectId],
-    references: [projects.id],
-  }),
-  nodes: many(aiNodes),
-}));
+export const cliSessions = pgTable("cli_session", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  userId: uuid("userId").references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending | verified | expired
+  token: varchar("token", { length: 512 }),
+  userAgent: varchar("userAgent", { length: 500 }),
+  expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+});
 
-export const aiNodeRelations = relations(aiNodes, ({ one }) => ({
-  automation: one(aiAutomations, {
-    fields: [aiNodes.automationId],
-    references: [aiAutomations.id],
-  }),
-}));
+// ═══════════════════════════════════════════════════════════
+// Subscriptions (Stripe)
+// ═══════════════════════════════════════════════════════════
+
+export const subscriptions = pgTable("subscription", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  stripeCustomerId: varchar("stripeCustomerId", { length: 255 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 255 }),
+  plan: varchar("plan", { length: 50 }).default("free").notNull(), // free | starter | pro | enterprise
+  status: varchar("status", { length: 50 }).default("active").notNull(), // active | canceled | past_due | trialing
+  currentPeriodStart: timestamp("currentPeriodStart", { mode: "date" }),
+  currentPeriodEnd: timestamp("currentPeriodEnd", { mode: "date" }),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").default(false),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════════
+// Usage Tracking
+// ═══════════════════════════════════════════════════════════
+
+export const usage = pgTable("usage", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  aiRequestsCount: integer("aiRequestsCount").default(0).notNull(),
+  pipelineRunsCount: integer("pipelineRunsCount").default(0).notNull(),
+  deploymentsCount: integer("deploymentsCount").default(0).notNull(),
+  cliRequestsCount: integer("cliRequestsCount").default(0).notNull(),
+  periodStart: timestamp("periodStart", { mode: "date" }).defaultNow().notNull(),
+  periodEnd: timestamp("periodEnd", { mode: "date" }).notNull(),
+});
+
+// ═══════════════════════════════════════════════════════════
+// Relations
+// ═══════════════════════════════════════════════════════════
 
 export const organizationRelations = relations(organizations, ({ many }) => ({
   users: many(users),
@@ -265,6 +302,9 @@ export const userRelations = relations(users, ({ one, many }) => ({
   accounts: many(accounts),
   sessions: many(sessions),
   aiConversations: many(aiConversations),
+  subscription: many(subscriptions),
+  usage: many(usage),
+  cliSessions: many(cliSessions),
 }));
 
 export const projectRelations = relations(projects, ({ one, many }) => ({
@@ -357,5 +397,41 @@ export const aiMessageRelations = relations(aiMessages, ({ one }) => ({
   conversation: one(aiConversations, {
     fields: [aiMessages.conversationId],
     references: [aiConversations.id],
+  }),
+}));
+
+export const aiAutomationRelations = relations(aiAutomations, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [aiAutomations.projectId],
+    references: [projects.id],
+  }),
+  nodes: many(aiNodes),
+}));
+
+export const aiNodeRelations = relations(aiNodes, ({ one }) => ({
+  automation: one(aiAutomations, {
+    fields: [aiNodes.automationId],
+    references: [aiAutomations.id],
+  }),
+}));
+
+export const cliSessionRelations = relations(cliSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [cliSessions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const subscriptionRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const usageRelations = relations(usage, ({ one }) => ({
+  user: one(users, {
+    fields: [usage.userId],
+    references: [users.id],
   }),
 }));

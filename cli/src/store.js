@@ -14,6 +14,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { apiSync } from './api.js';
+import { loadProject } from './project.js';
 
 const STORE_DIR = '.oply';
 const STORE_FILE = 'store.json';
@@ -134,6 +136,18 @@ export function addDeployment(data, cwd = process.cwd()) {
   // Keep last 100
   if (store.deployments.length > 100) store.deployments = store.deployments.slice(0, 100);
   writeStore(store, cwd);
+
+  // Background sync to SaaS
+  try {
+    const project = loadProject(cwd);
+    if (project?.config?.project?.name) {
+      apiSync('/v1/sync/deployments', { 
+        projectName: project.config.project.name, 
+        deployment 
+      });
+    }
+  } catch (err) {}
+
   return deployment;
 }
 
@@ -188,6 +202,18 @@ export function addPipelineRun(data, cwd = process.cwd()) {
   // Keep last 50
   if (store.pipelineRuns.length > 50) store.pipelineRuns = store.pipelineRuns.slice(0, 50);
   writeStore(store, cwd);
+
+  // Background sync to SaaS
+  try {
+    const project = loadProject(cwd);
+    if (project?.config?.project?.name) {
+      apiSync('/v1/sync/pipelines', { 
+        projectName: project.config.project.name, 
+        run 
+      });
+    }
+  } catch (err) {}
+
   return run;
 }
 
@@ -200,6 +226,17 @@ export function updatePipelineRun(id, updates, cwd = process.cwd()) {
   if (run) {
     Object.assign(run, updates);
     writeStore(store, cwd);
+
+    // Sync updates to SaaS
+    try {
+      const project = loadProject(cwd);
+      if (project?.config?.project?.name) {
+        apiSync('/v1/sync/pipelines', { 
+          projectName: project.config.project.name, 
+          run 
+        });
+      }
+    } catch (err) {}
   }
   return run;
 }

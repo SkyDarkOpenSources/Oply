@@ -69,6 +69,9 @@ export default function LandingPage() {
             </a>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="text-sm text-gray-400 hover:text-white transition-colors">
+              Dashboard
+            </Link>
             <a
               href="https://github.com"
               target="_blank"
@@ -80,6 +83,9 @@ export default function LandingPage() {
               </svg>
               GitHub
             </a>
+            <Link href="/login" className="h-9 px-4 rounded-lg bg-[#00E5FF] text-black text-sm font-semibold flex items-center justify-center hover:bg-[#00E5FF]/90 transition-colors">
+              Sign In
+            </Link>
           </div>
         </div>
       </nav>

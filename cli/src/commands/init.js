@@ -13,6 +13,7 @@ import path from 'path';
 import config from '../config.js';
 import { initStore, addDeployment } from '../store.js';
 import { isGitRepo, getCurrentBranch, getCommitHash, getRemoteUrl } from '../git.js';
+import { apiSync } from '../api.js';
 
 export function initCommand(program) {
   program
@@ -113,9 +114,9 @@ export function initCommand(program) {
         const keyAnswers = await inquirer.prompt([
           {
             type: 'password',
-            name: 'openaiKey',
-            message: 'OpenAI API Key (for AI features):',
-            default: process.env.OPENAI_API_KEY || '',
+            name: 'groqKey',
+            message: 'Groq API Key (from console.groq.com):',
+            default: process.env.GROQ_API_KEY || '',
             mask: '*',
           },
           {
@@ -182,6 +183,15 @@ export function initCommand(program) {
         initStore(cwd);
         storeSpinner.succeed('Local state store created (.oply/)');
 
+        // ─── Step 6.5: Sync Project to SaaS ───────
+        try {
+          await apiSync('/v1/projects', {
+            name: answers.name,
+            provider: answers.provider,
+            repositoryUrl: answers.repo,
+          });
+        } catch (err) {}
+
         // ─── Step 7: Write .env.oply ──────────────
         const envLines = [
           '# ═══════════════════════════════════════════════════',
@@ -189,8 +199,8 @@ export function initCommand(program) {
           '# This file is gitignored. Do NOT commit it.',
           '# ═══════════════════════════════════════════════════',
           '',
-          '# OpenAI API Key (required for AI features)',
-          `OPENAI_API_KEY=${keyAnswers.openaiKey || ''}`,
+          '# Groq API Key (required for AI features)',
+          `GROQ_API_KEY=${keyAnswers.groqKey || ''}`,
           '',
           '# GitHub Personal Access Token (optional, for deployment status)',
           `GITHUB_TOKEN=${keyAnswers.githubToken || ''}`,

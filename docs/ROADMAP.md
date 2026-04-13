@@ -40,5 +40,5 @@ Oply takes a phased approach to building its autonomous capabilities. Trying to 
 
 1. **Enterprise Scalability:** Single-point-of-failures must be avoided. The Central Orchestrator should run in an HA cluster mode. Redis queues must be persistent.
 2. **"Read-only" Rollouts First:** Before enabling *autonomous* self-healing (which can be destructive or confusing), the AI must prompt the user with "Rollback suggested. Approve?" until trust is established.
-3. **Data Privacy / LLM Leaks:** Enterprise code cannot be sent to public OpenAI models. The AI Intelligence service should allow pluggable models so users can provide their own Anthropic Claude endpoints or local Llama 3 weights.
+3. **Data Privacy / AI Studio:** Enterprise code should be handled with privacy in mind. While we default to **Google Gemini 1.5 Pro** via AI Studio, the AI Intelligence service should allow pluggable models so users can provide their own Anthropic Claude endpoints or local Llama 3 weights.
 4. **Seamless Integration vs Replacement:** Many organizations have existing GitHub Actions. Oply must be able to visually represent and wrap around external GitHub Actions initially before replacing them entirely with the native Oply execution graph.

@@ -204,45 +204,51 @@ export function deployCommand(program) {
 
         // ─── Step 3: AI Risk Assessment ───────────
         let riskScore = null;
-        const apiKey = process.env.OPENAI_API_KEY;
+        
+        const riskSpinner = ora('Groq calculating deployment risk...').start();
+        try {
+          const { ChatGroq } = await import('@langchain/groq');
+          const { ChatPromptTemplate } = await import('@langchain/core/prompts');
+          const { StringOutputParser } = await import('@langchain/core/output_parsers');
 
-        if (apiKey && !options.dryRun) {
-          const riskSpinner = ora('AI calculating deployment risk...').start();
-          try {
-            const diff = getRecentDiff(2000, cwd);
-            const OpenAI = (await import('openai')).default;
-            const openai = new OpenAI({ apiKey });
-            const response = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
-              temperature: 0.1,
-              max_tokens: 100,
-              messages: [
-                { role: 'system', content: 'You are a deployment risk analyzer. Given a git diff, respond with ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>"}. Lower score = safer.' },
-                { role: 'user', content: `Environment: ${env}\nStrategy: ${strategy}\nDiff:\n${diff || 'No changes detected'}` },
-              ],
-            });
+          const groqApiKey = process.env.GROQ_API_KEY || process.env.GOOGLE_API_KEY;
+          if (!groqApiKey) throw new Error('GROQ_API_KEY not set');
 
-            const riskText = response.choices[0]?.message?.content || '';
-            try {
-              const riskData = JSON.parse(riskText);
-              riskScore = riskData.score;
-              const riskColor = riskScore <= 30 ? chalk.green : riskScore <= 60 ? chalk.yellow : chalk.red;
-              riskSpinner.succeed(`Risk Score: ${riskColor(`${riskScore}/100`)} — ${chalk.gray(riskData.reason || '')}`);
-              appendRunLog(run.id, `AI Risk Score: ${riskScore}/100 — ${riskData.reason || ''}`, cwd);
-            } catch {
-              riskSpinner.succeed(`Risk assessment complete`);
-            }
-          } catch (err) {
-            riskSpinner.warn('AI risk assessment skipped');
-          }
+          const model = new ChatGroq({
+            model: "openai/gpt-oss-120b",
+            temperature: 0.1,
+            apiKey: groqApiKey,
+          });
 
-          // Block high-risk production deployments
-          if (riskScore && riskScore > (project.config.ai?.riskThreshold || 60) && env.includes('prod')) {
-            console.log(chalk.red.bold('\n  ⛔ HIGH RISK — deployment blocked'));
-            console.log(chalk.gray('  Risk score exceeds threshold. Review changes before deploying.\n'));
-            updateDeployment(deployment.id, { status: 'BLOCKED', duration: Date.now() - startTime }, cwd);
-            return;
-          }
+          const diff = getRecentDiff(2000, cwd);
+          const prompt = ChatPromptTemplate.fromMessages([
+            ["system", `You are a deployment risk analyzer. Given a git diff, respond with ONLY a JSON object: {{"score": <0-100>, "reason": "<one sentence>"}}. Lower score = safer.`],
+            ["user", `Environment: {env}\nStrategy: {strategy}\nDiff:\n{diff}`]
+          ]);
+
+          const chain = prompt.pipe(model).pipe(new StringOutputParser());
+          const result = await chain.invoke({
+            env: env,
+            strategy: strategy,
+            diff: diff || 'No changes detected'
+          });
+          
+          const riskData = JSON.parse(result.replace(/```json|```/g, '').trim());
+          riskScore = riskData.score;
+          
+          const riskColor = riskScore <= 30 ? chalk.green : riskScore <= 60 ? chalk.yellow : chalk.red;
+          riskSpinner.succeed(`Risk Score: ${riskColor(`${riskScore}/100`)} — ${chalk.gray(riskData.reason || '')}`);
+          appendRunLog(run.id, `AI Risk Score: ${riskScore}/100 — ${riskData.reason || ''}`, cwd);
+        } catch (err) {
+          riskSpinner.warn('AI risk assessment skipped: ' + err.message);
+        }
+
+        // Block high-risk production deployments
+        if (riskScore && riskScore > (project.config.ai?.riskThreshold || 60) && env.includes('prod')) {
+          console.log(chalk.red.bold('\n  ⛔ HIGH RISK — deployment blocked'));
+          console.log(chalk.gray('  Risk score exceeds threshold. Review changes before deploying.\n'));
+          updateDeployment(deployment.id, { status: 'BLOCKED', duration: Date.now() - startTime }, cwd);
+          return;
         }
 
         // ─── Step 4: K8s Deployment ───────────────
@@ -356,6 +362,7 @@ async function executeStages(stages, cwd, runId, dryRun = false) {
       appendRunLog(runId, `FAIL ${stage.name}: ${errLine}`, cwd);
 
       allPassed = false;
+      console.log(chalk.gray('    💡 Run ') + chalk.cyan('oply ai-debug --auto-fix') + chalk.gray(' to let AI fix this'));
       break; // Stop on first failure
     }
   }

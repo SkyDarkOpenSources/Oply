@@ -10,12 +10,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { deployments } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { getApiAuth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getApiAuth();
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getApiAuth();
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       imageTag,
       strategy,
       status: "PENDING",
-      approvedBy: session.user.id,
+      approvedBy: user.id,
       approvedAt: new Date(),
     }).returning();
 
@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
+    const user = await getApiAuth();
+    if (!user || !user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -128,7 +128,7 @@ export async function PATCH(request: NextRequest) {
         .update(deployments)
         .set({
           status: "PROGRESSING",
-          approvedBy: session.user.id,
+          approvedBy: user.id,
           approvedAt: new Date(),
           updatedAt: new Date(),
         })

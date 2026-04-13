@@ -224,6 +224,7 @@ export function pipelineCommand(program) {
         console.log(chalk.gray(`  View logs: `) + chalk.cyan(`oply logs --pipeline ${run.id}`));
         if (!allPassed) {
           console.log(chalk.gray('  Debug: ') + chalk.cyan('oply ai-debug'));
+          console.log(chalk.gray('  Auto-fix: ') + chalk.cyan('oply ai-debug --auto-fix'));
         }
         console.log('');
 
@@ -234,14 +235,14 @@ export function pipelineCommand(program) {
 
   // ─── oply pipeline generate ───────────────────
   cmd.command('generate')
-    .description('Re-generate the pipeline DAG from your codebase')
+    .description('AI-powered pipeline DAG generation from your codebase')
     .action(async () => {
       try {
         const project = loadProject();
         const cwd = project.projectDir;
         const stack = project.config.stack;
 
-        console.log(chalk.bold(`\n  🔧 Pipeline Generator\n`));
+        console.log(chalk.bold(`\n  🔧 AI Pipeline Generator\n`));
         console.log(chalk.gray(`  Stack: ${stack?.language || 'unknown'} / ${stack?.framework || 'unknown'}\n`));
 
         const stages = project.config.pipeline?.stages || [];
@@ -250,7 +251,7 @@ export function pipelineCommand(program) {
           const { overwrite } = await inquirer.prompt([{
             type: 'confirm',
             name: 'overwrite',
-            message: `Pipeline already has ${stages.length} stages. Regenerate?`,
+            message: `Pipeline already has ${stages.length} stages. Regenerate with AI?`,
             default: false,
           }]);
           if (!overwrite) {
@@ -259,21 +260,121 @@ export function pipelineCommand(program) {
           }
         }
 
-        const spinner = ora('Scanning codebase and generating DAG...').start();
-        await sleep(800);
-        spinner.succeed('Pipeline DAG generated');
+        const spinner = ora('AI scanning codebase and generating DAG...').start();
 
-        // Show current pipeline
-        console.log(chalk.bold('\n  Pipeline Stages:'));
-        (project.config.pipeline?.stages || []).forEach(s => {
-          const icon = getStageIcon(s.type);
-          const deps = (s.dependsOn || []).length > 0 ? chalk.gray(` ← ${s.dependsOn.join(', ')}`) : '';
-          console.log(`  ${icon} ${chalk.white(s.name.padEnd(22))} ${chalk.gray(s.command)}${deps}`);
-        });
-        console.log('');
-        console.log(chalk.gray('  Pipeline is defined in oply.config.json'));
-        console.log(chalk.gray('  Run it with: ') + chalk.cyan('oply pipeline trigger'));
-        console.log('');
+        // Gather repo context for AI
+        let repoFiles = '';
+        try {
+          const listFiles = (dir, prefix = '') => {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            const result = [];
+            for (const entry of entries) {
+              if (['node_modules', '.git', '.oply', 'dist', 'build', '.next', 'coverage'].includes(entry.name)) continue;
+              if (entry.isDirectory()) {
+                result.push(`${prefix}${entry.name}/`);
+                result.push(...listFiles(path.join(dir, entry.name), `${prefix}  `));
+              } else {
+                result.push(`${prefix}${entry.name}`);
+              }
+            }
+            return result;
+          };
+          repoFiles = listFiles(cwd).slice(0, 100).join('\n');
+        } catch { repoFiles = 'Could not scan files'; }
+
+        let packageJson = '';
+        try {
+          const pkgPath = path.join(cwd, 'package.json');
+          if (fs.existsSync(pkgPath)) {
+            packageJson = fs.readFileSync(pkgPath, 'utf8');
+          }
+        } catch { /* ignore */ }
+
+        let dockerfile = '';
+        try {
+          const dockerPath = path.join(cwd, 'Dockerfile');
+          if (fs.existsSync(dockerPath)) {
+            dockerfile = fs.readFileSync(dockerPath, 'utf8');
+          }
+        } catch { /* ignore */ }
+
+        try {
+          const { ChatGroq } = await import('@langchain/groq');
+          const { ChatPromptTemplate } = await import('@langchain/core/prompts');
+          const { StringOutputParser } = await import('@langchain/core/output_parsers');
+
+          const groqApiKey = process.env.GROQ_API_KEY;
+          if (!groqApiKey) {
+            spinner.warn('GROQ_API_KEY not set — using local detection instead');
+            spinner.succeed('Pipeline generated from local detection');
+            showCurrentPipeline(project);
+            return;
+          }
+
+          const model = new ChatGroq({
+            model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+            maxTokens: 1500,
+            temperature: 0.1,
+            apiKey: groqApiKey,
+          });
+
+          const generatorPrompt = `You are a CI/CD pipeline generator. Analyze the repo and output ONLY a valid JSON array of pipeline stages. No markdown, no explanation.
+
+Format: [{"id":"install","type":"BUILD","name":"Install Dependencies","command":"npm install","dependsOn":[]}, ...]
+
+Types: BUILD, TEST, LINT, SECURITY_SCAN, DEPLOY
+Rules:
+- Detect from package.json scripts, Dockerfile, config files
+- Install → Lint → Test → Build is the minimum
+- Add docker-build if Dockerfile exists  
+- Set dependsOn chains correctly`;
+
+          const prompt = ChatPromptTemplate.fromMessages([
+            ["system", generatorPrompt],
+            ["user", "Stack: {stack}\n\nFiles:\n{files}\n\npackage.json:\n{packageJson}\n\nDockerfile:\n{dockerfile}"],
+          ]);
+
+          const chain = prompt.pipe(model).pipe(new StringOutputParser());
+          const result = await chain.invoke({
+            stack: JSON.stringify(stack),
+            files: repoFiles.slice(0, 2000),
+            packageJson: packageJson.slice(0, 1500),
+            dockerfile: dockerfile.slice(0, 500),
+          });
+
+          // Parse AI response
+          const jsonStr = result.replace(/```json|```/g, '').trim();
+          const newStages = JSON.parse(jsonStr);
+
+          if (!Array.isArray(newStages) || newStages.length === 0) {
+            throw new Error('AI returned invalid pipeline format');
+          }
+
+          // Write to config
+          const configPath = path.join(cwd, 'oply.config.json');
+          const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          config.pipeline = { stages: newStages };
+          fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+          spinner.succeed(`AI generated ${newStages.length} pipeline stages`);
+
+          // Display
+          console.log(chalk.bold('\n  Pipeline Stages:'));
+          newStages.forEach(s => {
+            const icon = getStageIcon(s.type);
+            const deps = (s.dependsOn || []).length > 0 ? chalk.gray(` ← ${s.dependsOn.join(', ')}`) : '';
+            console.log(`  ${icon} ${chalk.white((s.name || s.id).padEnd(22))} ${chalk.gray(s.command)}${deps}`);
+          });
+          console.log('');
+          console.log(chalk.green('  ✓ Saved to oply.config.json'));
+          console.log(chalk.gray('  Run it with: ') + chalk.cyan('oply pipeline trigger'));
+          console.log('');
+
+        } catch (aiErr) {
+          spinner.fail('AI generation failed: ' + aiErr.message);
+          console.log(chalk.gray('  Falling back to showing existing pipeline.\n'));
+          showCurrentPipeline(project);
+        }
 
       } catch (error) {
         console.error(chalk.red(`\n  Error: ${error.message}\n`));
@@ -372,6 +473,24 @@ export function pipelineCommand(program) {
 }
 
 // ─── Helpers ────────────────────────────────────
+
+function showCurrentPipeline(project) {
+  const stages = project.config.pipeline?.stages || [];
+  if (stages.length === 0) {
+    console.log(chalk.gray('  No pipeline stages defined.\n'));
+    return;
+  }
+  console.log(chalk.bold('\n  Pipeline Stages:'));
+  stages.forEach(s => {
+    const icon = getStageIcon(s.type);
+    const deps = (s.dependsOn || []).length > 0 ? chalk.gray(` ← ${s.dependsOn.join(', ')}`) : '';
+    console.log(`  ${icon} ${chalk.white((s.name || s.id).padEnd(22))} ${chalk.gray(s.command)}${deps}`);
+  });
+  console.log('');
+  console.log(chalk.gray('  Pipeline is defined in oply.config.json'));
+  console.log(chalk.gray('  Run it with: ') + chalk.cyan('oply pipeline trigger'));
+  console.log('');
+}
 
 function getStageIcon(type) {
   const map = {

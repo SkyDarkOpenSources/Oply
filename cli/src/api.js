@@ -126,7 +126,7 @@ export async function getGitHubDeployments(owner, repo, limit = 5) {
     const { data } = await client.get(`/repos/${owner}/${repo}/deployments`, {
       params: { per_page: limit },
     });
-    
+
     // Get status for each deployment
     const deployments = [];
     for (const dep of data) {
@@ -139,7 +139,7 @@ export async function getGitHubDeployments(owner, repo, limit = 5) {
           status = statusRes.data[0].state;
         }
       } catch { /* ignore */ }
-      
+
       deployments.push({
         id: dep.id,
         environment: dep.environment,
@@ -153,5 +153,19 @@ export async function getGitHubDeployments(owner, repo, limit = 5) {
     return deployments;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Perform a push sync to the Oply backend, returning safely if offline or unauthenticated.
+ */
+export async function apiSync(endpoint, payload) {
+  try {
+    const client = getClient();
+    const result = await client.post(endpoint, payload);
+    return { ok: true, data: result.data };
+  } catch (error) {
+    // Fails silently for local-first degraded mode
+    return { ok: false, reason: 'offline or unavailable' };
   }
 }

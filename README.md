@@ -44,7 +44,7 @@ Oply is an **enterprise-grade, autonomous software delivery platform** that acts
 │       │               │                       │                 │
 │       │          ┌────▼──────┐          ┌─────▼──────┐          │
 │       │          │ PostgreSQL│          │ AI Engine  │          │
-│       │          │ (Drizzle) │          │ (OpenAI)   │          │
+│       │          │ (Drizzle) │          │ (Gemini)   │          │
 │       │          └───────────┘          └────────────┘          │
 │       │               │                       │                 │
 │  ┌────▼────┐    ┌─────▼─────┐          ┌──────▼─────┐           │
@@ -66,7 +66,7 @@ Oply is an **enterprise-grade, autonomous software delivery platform** that acts
 | Frontend | Next.js 16, Tailwind CSS 4 | Dashboard & landing page |
 | Database | PostgreSQL + Drizzle ORM | Persistent storage |
 | Auth | NextAuth v5 (GitHub + Google OAuth) | User authentication |
-| AI | OpenAI GPT-4o | Copilot, pipeline gen, failure analysis |
+| AI | Google Gemini 1.5 Pro | Copilot, pipeline gen, failure analysis |
 | Queue | Redis + BullMQ | Job queue for pipeline execution |
 | CLI | Node.js + Commander + Dockerode | Command-line interface |
 | Infra | Docker, Kubernetes, AWS | Build, deploy, orchestrate |
@@ -179,7 +179,7 @@ GITHUB_CLIENT_ID=...
 GITHUB_CLIENT_SECRET=...
 
 # AI (for Copilot & pipeline generation)
-OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
 ```
 
 ### 2. Install & Setup Database
@@ -234,7 +234,7 @@ oply pipeline trigger
 # Deploy to staging
 oply deploy --env staging
 
-# AI debugging (uses your OPENAI_API_KEY from .env.oply)
+# AI debugging (uses your GOOGLE_API_KEY from .env.oply)
 oply ai-debug
 
 # View Kubernetes pods
@@ -400,7 +400,7 @@ See [`.env.example`](.env.example) for all configuration options:
 | `GITHUB_CLIENT_SECRET` | ✅ | GitHub OAuth secret |
 | `GOOGLE_CLIENT_ID` | ◻️ | Google OAuth ID |
 | `GOOGLE_CLIENT_SECRET` | ◻️ | Google OAuth secret |
-| `OPENAI_API_KEY` | ◻️ | For AI Copilot & pipeline gen |
+| `GOOGLE_API_KEY` | ◻️ | For AI Copilot & pipeline gen |
 | `REDIS_URL` | ◻️ | BullMQ job queue |
 | `GITHUB_WEBHOOK_SECRET` | ◻️ | Webhook signature verification |
 | `DOCKER_REGISTRY_URL` | ◻️ | Docker registry for image pushes |

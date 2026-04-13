@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import Copilot from "@/components/Copilot";
 import "./globals.css";
+import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Oply — Autonomous Software Delivery Platform",
@@ -21,8 +22,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark h-full antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
+        <Copilot />
       </body>
     </html>
   );

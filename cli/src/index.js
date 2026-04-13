@@ -44,6 +44,7 @@ import { dockerCommand } from './commands/docker.js';
 import { k8sCommand } from './commands/k8s.js';
 import { rollbackCommand } from './commands/rollback.js';
 import { stageCommand } from './commands/stage.js';
+import { loginCommand } from './commands/login.js';
 
 // ─── Banner ──────────────────────────────────────────
 const oplyGradient = gradient(['#6366f1', '#8b5cf6', '#a78bfa']);
@@ -94,6 +95,7 @@ pipelineCommand(program);
 dockerCommand(program);
 k8sCommand(program);
 rollbackCommand(program);
+loginCommand(program);
 
 // Default: show help with banner
 if (process.argv.length <= 2) {
